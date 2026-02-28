@@ -14,17 +14,8 @@ OS = platform.system()
 
 class SecurityManager:
 
-    def stop_scan(self) -> str:
-        """Attempt to stop an active scan."""
-        if OS == "Windows":
-            try:
-                # Use MpCmdRun to cancel any in-progress scans
-                cmd = ["C:\\Program Files\\Windows Defender\\MpCmdRun.exe", "-Scan", "-Cancel"]
-                subprocess.run(cmd, shell=True, capture_output=True)
-                return "Requested Windows Defender to stop any active scans."
-            except Exception as e:
-                return f"Could not stop scan: {e}"
-        return "Scan stoppage not implemented for this OS."
+    def quick_scan(self) -> str:
+        return self._scan("Quick")
 
     def full_scan(self) -> str:
         return self._scan("Full")

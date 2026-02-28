@@ -1451,7 +1451,6 @@ def test_regressions():
     def t_bug4_dj_method_call():
         src = Path("core/command_router.py").read_text(encoding="utf-8")
         # Should have self._get_dj() calls in handlers.
-        # We check for the presence of the call but the absence of the BUGGY call.
         assert "self._get_dj()" in src, "Missing self._get_dj() calls"
         # The buggy version was something like 'dj = _get_dj(self)'
         assert "_get_dj(self)" not in src.replace("def _get_dj(self):", ""), \

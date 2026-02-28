@@ -749,6 +749,58 @@ class ThemeManager:
             background-color: {c['primary']}; border-color: {c['primary']};
         }}
 
+        /* ═══════ GROUPBOX — BUG-11 ═══════ */
+        QGroupBox {{
+            color: {c['text']}; font-size: 13px; font-weight: bold;
+            border: 1px solid {c['border']}; border-radius: 8px;
+            margin-top: 16px; padding-top: 12px;
+        }}
+        QGroupBox::title {{
+            subcontrol-origin: margin; subcontrol-position: top left;
+            padding: 0 8px; color: {c['primary']}; left: 12px;
+        }}
+
+        /* ═══════ SIDEBAR ═══════ */
+        #sidebar {{
+            background-color: {c['secondary']};
+            border-right: 1px solid {c['border']};
+        }}
+        #sidebarButton {{
+            background-color: transparent; color: {c['primary']};
+            border: 1px solid transparent; border-radius: 12px;
+            font-size: 20px;
+        }}
+        #sidebarButton:hover {{
+            background-color: {c['surface_elevated']};
+            border: 1px solid {c['border']};
+        }}
+        #sidebarButton:pressed {{
+            background-color: {c['primary']}; color: {c['background']};
+        }}
+
+        /* ═══════ SEARCH BAR ═══════ */
+        #searchBar {{
+            background-color: {c['surface']};
+            border-bottom: 1px solid {c['border']};
+        }}
+        #searchInput {{
+            background-color: {c['input_bg']}; color: {c['text']};
+            border: 1px solid {c['border']}; border-radius: 16px;
+            padding: 4px 14px; font-size: 13px;
+        }}
+        #searchInput:focus {{ border: 1px solid {c['primary']}; }}
+
+        /* ═══════ MOOD BADGE ═══════ */
+        #moodBadge {{ background: transparent; border: none; }}
+
+        /* ═══════ REACT BUTTON ═══════ */
+        #reactButton {{
+            background: rgba(255,255,255,0.05); color: {c['text_dim']};
+            border: 1px solid {c['border']}; border-radius: 9px;
+            font-size: 10px; padding: 0;
+        }}
+        #reactionLabel {{ font-size: 15px; }}
+
         /* ═══════ SPINBOXES ═══════ */
         QSpinBox {{
             background-color: {c['input_bg']}; color: {c['text']};

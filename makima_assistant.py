@@ -218,12 +218,13 @@ class MakimaAssistant:
         if not user_input:
             return
 
+        # Interrupt current speech if new input arrives
+        if getattr(self, "tts_engine", None):
+            self.tts_engine.stop()
+
         response = self.manager.handle(user_input, source="voice" if not self.text_mode else "text")
 
         if response:
-            if getattr(self, "memory", None):
-                self.memory.save_conversation("makima", response)
-            
             # Detect language hint from Devanagari characters
             lang = "hi" if any("\u0900" <= ch <= "\u097f" for ch in response) else "en"
             self.speak(response, lang=lang)

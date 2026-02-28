@@ -25,7 +25,9 @@ STOPWORDS = {
     "in","on","at","to","for","of","with","by","from",
     "and","or","but","so","yet","if","then","than","into",
     "i","me","we","you","it","just","also","very","really",
-    "about", "know", "tell", "think", "get", "got", "let",
+    "about","know","tell","think","get","got","let",
+    "favorite","favourite","preferred","prefer","default",
+    "usual","best","love","enjoy","use","used","using","like",
 }
 
 MEMORY_DIR = "makima_memory"

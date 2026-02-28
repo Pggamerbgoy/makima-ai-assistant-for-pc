@@ -23,6 +23,7 @@ class MiniModeWindow(QWidget):
     """Compact floating assistant window."""
 
     expand_requested = pyqtSignal()  # emitted on double-click
+    _sig_response = pyqtSignal(str)  # BUG-09: thread-safe response update
 
     def __init__(self, makima, parent=None):
         super().__init__(parent)
@@ -38,6 +39,7 @@ class MiniModeWindow(QWidget):
         self.setFixedSize(360, 140)
 
         self._build_ui()
+        self._sig_response.connect(self.response_label.setText)  # BUG-09
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -132,9 +134,9 @@ class MiniModeWindow(QWidget):
         try:
             response = self.makima.process_input(text)
             display = (response or "Done.")[:120]
-            self.response_label.setText(display)
+            self._sig_response.emit(display)  # BUG-09: use signal, not direct call
         except Exception as e:
-            self.response_label.setText(f"Error: {e}")
+            self._sig_response.emit(f"Error: {e}")
 
     # ── Dragging ──────────────────────────────────────────────────────────────
 

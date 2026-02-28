@@ -266,13 +266,22 @@ class SettingsDialog(QDialog):
             if hasattr(self.makima, "ai"):
                 self.makima.ai.set_persona(persona)
 
-            # Apply auto-DJ
-            dj = getattr(self.makima.manager.music, "_dj", None)
-            if dj:
-                dj.auto_dj_enabled = self.auto_dj_cb.isChecked()
-                for mood, slider in self._vol_sliders.items():
-                    dj.config.setdefault("volume_overrides", {})[mood] = slider.value()
-                dj._save_config()
+            # Apply auto-DJ — BUG-08: guard against missing manager/music/dj
+            try:
+                manager = getattr(self.makima, 'manager', None)
+                music_sys = getattr(manager, 'music', None) if manager else None
+                dj = getattr(music_sys, '_dj', None) if music_sys else None
+                if dj is None:
+                    # Try common alternative attribute names
+                    dj = getattr(self.makima, '_dj', None) or getattr(self.makima, 'dj', None)
+                if dj:
+                    dj.auto_dj_enabled = self.auto_dj_cb.isChecked()
+                    for mood, slider in self._vol_sliders.items():
+                        dj.config.setdefault("volume_overrides", {})[mood] = slider.value()
+                    if hasattr(dj, '_save_config'):
+                        dj._save_config()
+            except Exception as e:
+                logger.warning(f"DJ settings save skipped: {e}")
 
             # Save API configs to .env
             env_updates = {

@@ -111,6 +111,14 @@ FEW_SHOT_EXAMPLES = {
 }
 
 
+# ── Optional session summarizer ──────────────────────────────────────────────
+try:
+    from core.session_summarizer import SessionSummarizer
+    _SUMMARIZER_CLS = SessionSummarizer
+except ImportError:
+    _SUMMARIZER_CLS = None
+
+
 class AIHandler:
     """Manages AI backends with automatic failover and conversation history."""
 
@@ -138,6 +146,14 @@ class AIHandler:
 
         self._init_gemini()
 
+        # Session summarizer — compresses history when it gets too long
+        self._summarizer = None
+        if _SUMMARIZER_CLS:
+            try:
+                self._summarizer = _SUMMARIZER_CLS(ai_handler=self)
+            except Exception:
+                pass
+
     # ─── Initialization ───────────────────────────────────────────────────────
 
     def _init_gemini(self):
@@ -159,8 +175,19 @@ class AIHandler:
     # ─── History Management ───────────────────────────────────────────────────
 
     def _trim_history(self):
-        """Keep only the last N turns (user+assistant pairs)."""
+        """Keep only the last N turns. If history is long, compress via summarizer first."""
         max_messages = self.max_history_turns * 2
+
+        # 1. Try session summarizer first (creates summary + keeps recent turns)
+        if self._summarizer and len(self.conversation_history) > max_messages:
+            try:
+                self.conversation_history = self._summarizer.maybe_compress(
+                    self.conversation_history
+                )
+            except Exception as e:
+                pass  # Fall through to simple trim
+
+        # 2. ALWAYS enforce the hard limit as a floor
         if len(self.conversation_history) > max_messages:
             self.conversation_history = self.conversation_history[-max_messages:]
 

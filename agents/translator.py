@@ -56,7 +56,7 @@ DEEPL_KEY = os.getenv("DEEPL_API_KEY", "")
 
 
 class TranslationSystem:
-    """Bidirectional real-time translation with auto-detection."""
+    """Translation and language detection service."""
 
     def __init__(self, ai):
         self.ai = ai
