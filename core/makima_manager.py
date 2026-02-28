@@ -34,6 +34,25 @@ from typing import Optional, Callable, Dict, Any
 
 logger = logging.getLogger("Makima.Manager")
 
+# ── Optional feature imports ─────────────────────────────────────────────────
+try:
+    from systems.mood_tracker import MoodTracker
+    MOOD_AVAILABLE = True
+except ImportError:
+    MOOD_AVAILABLE = False
+
+try:
+    from core.session_summarizer import SessionSummarizer
+    SUMMARIZER_AVAILABLE = True
+except ImportError:
+    SUMMARIZER_AVAILABLE = False
+
+try:
+    from systems.daily_briefing import DailyBriefing
+    BRIEFING_AVAILABLE = True
+except ImportError:
+    BRIEFING_AVAILABLE = False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SUB-MANAGERS  (each owns one domain)
@@ -259,10 +278,12 @@ class AgentManager:
 
         try:
             from core.command_router import CommandRouter
+            from agents.skill_teacher import SkillTeacher
             self._router = CommandRouter(ai=self._ai, memory=self._memory)
-            logger.info("🤖 AgentManager ready (CommandRouter)")
+            self._router.skill_teacher = SkillTeacher(self._ai, self._router)
+            logger.info("🤖 AgentManager ready (CommandRouter + SkillTeacher)")
         except Exception as e:
-            logger.warning(f"CommandRouter unavailable: {e}")
+            logger.warning(f"CommandRouter/SkillTeacher unavailable: {e}")
 
     def run(self, task: str, use_swarm: bool = True) -> str:
         """
@@ -412,9 +433,16 @@ class ToolsManager:
             logger.warning(f"ToolRegistry unavailable: {e}")
 
     def process(self, raw_input: str) -> str:
-        """Run input through cache → shortcuts → intent detection."""
+        """Run input through cache → shortcuts → intent detection.
+        Returns cached response (if cache hit) OR cleaned/expanded command string.
+        """
         if self._registry:
-            return self._registry.process_command(raw_input)
+            result = self._registry.process_command(raw_input)
+            # process_command returns (is_cached: bool, value: str)
+            if isinstance(result, tuple):
+                _is_cached, value = result
+                return value
+            return result
         return raw_input
 
     def cache_response(self, query: str, response: str):
@@ -612,6 +640,36 @@ class MakimaManager:
         self.simulator = DecisionSimulator()
         self.web       = WebSearchManager(ai_handler=self._ai)
 
+        # ── Mood Tracker ──────────────────────────────────────────────────────────
+        self.mood = None
+        if MOOD_AVAILABLE:
+            try:
+                self.mood = MoodTracker()
+                logger.info("🎭 MoodTracker ready")
+            except Exception as e:
+                logger.warning(f"MoodTracker unavailable: {e}")
+
+        # ── Session Summarizer ────────────────────────────────────────────────
+        self.summarizer = None
+        if SUMMARIZER_AVAILABLE:
+            try:
+                self.summarizer = SessionSummarizer(ai_handler=self._ai)
+                logger.info("📝 SessionSummarizer ready")
+            except Exception as e:
+                logger.warning(f"SessionSummarizer unavailable: {e}")
+
+        # ── Daily Briefing ────────────────────────────────────────────────────
+        self.briefing = None
+        if BRIEFING_AVAILABLE:
+            try:
+                self.briefing = DailyBriefing(
+                    ai=self._ai,
+                    memory=self._memory,
+                )
+                logger.info("📰 DailyBriefing ready")
+            except Exception as e:
+                logger.warning(f"DailyBriefing unavailable: {e}")
+
         # Wire tools to speak for proactive suggestions
         if self.tools._registry and hasattr(self.tools._registry, 'proactive'):
             if self.tools._registry.proactive:
@@ -640,9 +698,45 @@ class MakimaManager:
         logger.debug(f"[{source}] handle: {command!r}")
         self._fire_event("on_command", command=command, source=source)
 
-        # Save user turn to memory
-        if self._memory:
-            self._memory.save_conversation("user", command)
+        # ── Step 0: User turn (deferred save to avoid circular memory) ──────────
+        # We save this ONLY after the AI has a chance to retrieve *past* memories
+
+        # ── Mood analysis (non-blocking, enriches response tone) ──────────────
+        mood_result = None
+        if self.mood:
+            try:
+                mood_result = self.mood.analyze(command)
+                # Update AI awareness with current emotion
+                if self._ai and mood_result.emotion != "neutral":
+                    self._ai.update_awareness(
+                        active_window=self._ai.awareness_context.get("active_window", ""),
+                        vision_summary=self._ai.awareness_context.get("vision_summary", ""),
+                        distraction_level=mood_result.emotion,
+                    )
+                    self._ai.awareness_context["last_emotion"] = mood_result.emotion
+            except Exception as e:
+                logger.debug(f"Mood analysis failed: {e}")
+
+        # ── Daily briefing shortcut ───────────────────────────────────────────
+        briefing_triggers = ["good morning", "morning briefing", "daily briefing",
+                              "what's today look like", "full briefing", "quick briefing"]
+        if any(t in command.lower() for t in briefing_triggers):
+            if self.briefing:
+                try:
+                    style = "quick" if "quick" in command.lower() else "full"
+                    response = self.briefing.deliver(style=style)
+                    self._fire_event("on_response", response=response)
+                    if self._memory:
+                        self._memory.save_conversation("user", command) # Save now
+                        self._memory.save_conversation("makima", response)
+                    return response
+                except Exception as e:
+                    logger.warning(f"Daily briefing error: {e}")
+
+        # ── Mood check-in (proactive) ────────────────────────────────────────
+        if mood_result and mood_result.should_checkin:
+            # Speak the check-in as a side-channel (doesn't replace response)
+            self._fire_event("on_checkin", message=mood_result.checkin_message)
 
         # ── Step 1: Tool pipeline (cache hit = instant return) ────────────────
         processed = self.tools.process(command)
@@ -651,6 +745,7 @@ class MakimaManager:
         if processed != command and len(processed) > 20:
             self._fire_event("on_response", response=processed)
             if self._memory:
+                self._memory.save_conversation("user", command) # Save now
                 self._memory.save_conversation("makima", processed)
             return processed
 
@@ -660,12 +755,20 @@ class MakimaManager:
             self._execute_decision(command, autonomous)
             self._fire_event("on_response", response=autonomous)
             if self._memory:
+                self._memory.save_conversation("user", command) # Save now
                 self._memory.save_conversation("makima", autonomous)
             return autonomous
 
         # ── Step 3: Intent-based direct routing ──────────────────────────────
         intent = self.tools.detect_intent(command)
         
+        if intent and intent.type == "learn_skill" and intent.confidence > 0.8:
+            task = intent.entities.get("task", command)
+            response = self.agents.run(f"learn how to {task}")
+            self.tools.cache_response(command, response)
+            self._fire_event("on_response", response=response)
+            return response
+            
         # Detection for personal/identity/memory questions - use direct chat to preserve persona
         # BUT only if it doesn't look like a specific system command (handled by router)
         personal_check = any(pm in command.lower() for pm in ["who are you", "what are you", "how are you", "darling", "makima"])
@@ -676,6 +779,9 @@ class MakimaManager:
             if direct:
                 self.tools.cache_response(command, direct)
                 self._fire_event("on_response", response=direct)
+                if self._memory:
+                    self._memory.save_conversation("user", command) # Save now
+                    self._memory.save_conversation("makima", direct)
                 return direct
 
             # If no direct route, and it's chat-like, use AI.chat
@@ -684,13 +790,9 @@ class MakimaManager:
                 self.tools.cache_response(command, response)
                 self._fire_event("on_response", response=response)
                 if self._memory:
+                    self._memory.save_conversation("user", command) # Save now
                     self._memory.save_conversation("makima", response)
                 return response
-                self.tools.cache_response(command, direct)
-                self._fire_event("on_response", response=direct)
-                if self._memory:
-                    self._memory.save_conversation("makima", direct)
-                return direct
 
         # ── Step 4: Decision simulator for financial questions ────────────────
         if self._is_decision_question(command):
@@ -698,6 +800,7 @@ class MakimaManager:
             self.tools.cache_response(command, response)
             self._fire_event("on_response", response=response)
             if self._memory:
+                self._memory.save_conversation("user", command) # Save now
                 self._memory.save_conversation("makima", response)
             return response
 
@@ -707,6 +810,7 @@ class MakimaManager:
             self.tools.cache_response(command, response)
             self._fire_event("on_response", response=response)
             if self._memory:
+                self._memory.save_conversation("user", command) # Save now
                 self._memory.save_conversation("makima", response)
             return response
 
@@ -715,6 +819,7 @@ class MakimaManager:
         self.tools.cache_response(command, response)
         self._fire_event("on_response", response=response)
         if self._memory:
+            self._memory.save_conversation("user", command) # Save now
             self._memory.save_conversation("makima", response)
         return response
 
@@ -802,7 +907,6 @@ class MakimaManager:
             if not any(pm in c for pm in personal_markers):
                 return True
         return False
-
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 

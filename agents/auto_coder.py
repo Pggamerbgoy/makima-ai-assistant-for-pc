@@ -27,7 +27,8 @@ class AutoCoder:
             f"Rules: use only stdlib or common packages, include comments, "
             f"no markdown fences, no explanation — just the code."
         )
-        code = self.ai.chat(prompt)
+        sys_prompt = "You are an expert Python programmer. Write code matching the exact requirements. Output ONLY valid Python code."
+        code = self.ai.generate_response(sys_prompt, prompt)
         # Strip any accidental markdown fences
         import re
         code = re.sub(r"```python\s*", "", code)
@@ -64,4 +65,5 @@ class AutoCoder:
             return f"Script failed: {e}"
 
     def explain(self, code: str) -> str:
-        return self.ai.chat(f"Explain this code in simple terms:\n\n{code}")
+        resp, _ = self.ai.chat(f"Explain this code in simple terms:\n\n{code}")
+        return resp

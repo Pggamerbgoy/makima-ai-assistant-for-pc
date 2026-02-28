@@ -359,7 +359,7 @@ class CommandRouter:
                         res = handler(m)
                         return (str(res) if res else ""), handler_name
                     except Exception as e:
-                        logger.error(f"Handler {handler_name} error: {e}")
+                        logger.exception(f"Handler {handler_name} error: {e}")
                         return f"Something went wrong with that command.", handler_name
 
         # Check learned skills

@@ -68,7 +68,7 @@ class WebAgent:
             paragraphs = soup.find_all("p")
             text = " ".join(p.get_text() for p in paragraphs[:10])
             text = text[:2000]
-            summary = self.ai.chat(f"Summarize this in 3 sentences: {text}")
+            summary, _ = self.ai.chat(f"Summarize this in 3 sentences: {text}")
             return summary
         except Exception as e:
             return f"Couldn't fetch that page: {e}"

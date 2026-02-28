@@ -90,8 +90,8 @@ CALENDAR_PREF_PATTERNS = [
     (r"(?:what'?s? on )?my calendar|upcoming events?", "_handle_calendar_upcoming"),
     (r"set (?:my )?(?:default )([a-zA-Z0-9_\-]+) (?:app |platform )?to (.+)", "_handle_pref_set"),
     (r"set (?:my )?([a-zA-Z0-9_\-]+) preference to (.+)", "_handle_pref_set"),
-    (r"what(?:'s| is) my (?:default )([a-zA-Z0-9_\-]+)(?:\s+preference)?$", "_handle_pref_get"),
-    (r"what(?:'s| is) my ([a-zA-Z0-9_\-]+) preference$", "_handle_pref_get"),
+    (r"what(?:\'s| is) my (?:default )?([a-zA-Z0-9_\\-]+(?:\\s+[a-zA-Z0-9_\\-]+)*)(?:\\s+preference)?[?]?", "_handle_pref_get"),
+    (r"what(?:\'s| is) my ([a-zA-Z0-9_\\-]+(?:\\s+[a-zA-Z0-9_\\-]+)*) preference[?]?", "_handle_pref_get"),
     (r"(?:show|list) (?:my )?preferences", "_handle_pref_list"),
     (r"clear (?:my )?(.+?) preference", "_handle_pref_clear"),
 ]
@@ -266,12 +266,12 @@ def _handle_app_overview(self, m):
     return "App learner not available."
 
 APP_LEARNER_PATTERNS = [
-    (r"learn (?:the )?app (.+)",                              "_handle_learn_app"),
-    (r"how (?:do i|to) (.+?) in (.+)",                       "_handle_howto_in_app"),
-    (r"how (?:do i|to) (.+)",                                "_handle_howto"),
-    (r"next step",                                            "_handle_next_step"),
-    (r"(?:stop|exit|cancel) (?:guide|workflow|walkthrough)",  "_handle_stop_guide"),
-    (r"(?:tell me about|what is|describe) (?:the )?app (.+)","_handle_app_overview"),
+    (r"^learn (?:the )?app (.+)",                              "_handle_learn_app"),
+    (r"^how (?:do i|to) (.+?) in (.+)",                       "_handle_howto_in_app"),
+    (r"^how (?:do i|to) (.+)",                                "_handle_howto"),
+    (r"^next step",                                            "_handle_next_step"),
+    (r"^(?:stop|exit|cancel) (?:guide|workflow|walkthrough)",  "_handle_stop_guide"),
+    (r"^(?:tell me about|what is|describe) (?:the )?app (.+)","_handle_app_overview"),
 ]
 
 for _pattern, _handler_name in APP_LEARNER_PATTERNS:
@@ -377,5 +377,89 @@ for _name, _fn in [
     ("_get_qs", _get_qs),
     ("_handle_qs_invest", _handle_qs_invest),
     ("_handle_qs_job", _handle_qs_job),
+]:
+    setattr(CommandRouter, _name, _fn)
+
+# ─── Mood Tracker ────────────────────────────────────────────────────────────
+
+def _handle_my_mood(self, m):
+    mgr = getattr(self, '_mood', None)
+    if not mgr:
+        try:
+            from systems.mood_tracker import MoodTracker
+            self._mood = MoodTracker()
+            mgr = self._mood
+        except Exception:
+            return "Mood tracker not available."
+    return mgr.get_session_summary()
+
+def _handle_mood_history(self, m):
+    mgr = getattr(self, '_mood', None)
+    if not mgr:
+        try:
+            from systems.mood_tracker import MoodTracker
+            self._mood = MoodTracker()
+            mgr = self._mood
+        except Exception:
+            return "Mood tracker not available."
+    return mgr.get_history_summary()
+
+def _handle_set_mood(self, m):
+    emotion = m.group(1).strip()
+    mgr = getattr(self, '_mood', None)
+    if not mgr:
+        try:
+            from systems.mood_tracker import MoodTracker
+            self._mood = MoodTracker()
+            mgr = self._mood
+        except Exception:
+            return f"Got it, noted you're feeling {emotion}."
+    return mgr.set_emotion(emotion)
+
+MOOD_PATTERNS = [
+    (r"how am i (?:feeling|doing)[?]?|my (?:mood|vibe)[?]?",   "_handle_my_mood"),
+    (r"mood (?:history|trends?|log)",                           "_handle_mood_history"),
+    (r"i(?:'m| am) feeling (.+)",                              "_handle_set_mood"),
+    (r"i feel (.+)",                                            "_handle_set_mood"),
+]
+
+for _pattern, _handler_name in MOOD_PATTERNS:
+    CommandRouter.PATTERNS.insert(0, (_pattern, _handler_name))
+
+for _name, _fn in [
+    ("_handle_my_mood",    _handle_my_mood),
+    ("_handle_mood_history", _handle_mood_history),
+    ("_handle_set_mood",   _handle_set_mood),
+]:
+    setattr(CommandRouter, _name, _fn)
+
+
+# ─── Session Summarizer ──────────────────────────────────────────────────────
+
+def _handle_summarize_session(self, m):
+    if self.ai and hasattr(self.ai, "_summarizer") and self.ai._summarizer:
+        history = getattr(self.ai, "conversation_history", [])
+        if not history:
+            return "Nothing to summarize yet — we haven't talked much this session."
+        return self.ai._summarizer.summarize_session(history)
+    return "Session summarizer not available."
+
+def _handle_list_sessions(self, m):
+    if self.ai and hasattr(self.ai, "_summarizer") and self.ai._summarizer:
+        return self.ai._summarizer.format_session_list()
+    return "Session archive not available."
+
+SESSION_PATTERNS = [
+    (r"summarize (?:this )?(?:session|conversation|chat)",   "_handle_summarize_session"),
+    (r"(?:show|list) (?:past|old|archived|previous) sessions?", "_handle_list_sessions"),
+    (r"what did we (?:talk|discuss|cover) (?:about )?(?:today|this session)?", "_handle_summarize_session"),
+]
+
+for _pattern, _handler_name in SESSION_PATTERNS:
+    CommandRouter.PATTERNS.insert(0, (_pattern, _handler_name))
+
+for _name, _fn in [
+    ("_handle_summarize_session", _handle_summarize_session),
+    ("_handle_list_sessions",     _handle_list_sessions),
 ]:
     setattr(CommandRouter, _name, _fn)
