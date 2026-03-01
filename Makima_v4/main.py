@@ -34,13 +34,25 @@ class AIHandlerAdapter:
         self.ai = ai_handler
     
     def generate_response(self, system_prompt: str, user_message: str, temperature: float = 0.7) -> str:
-        # Re-inject the full Makima persona so V4 agents maintain her unique voice
-        from core.ai_handler import PERSONAS
-        persona = PERSONAS.get(self.ai.persona, PERSONAS["makima"])
+        prompt = f"{system_prompt}\nUser Request: {user_message}"
+        raw = None
+        if self.ai._is_gemini_available():
+            raw = self.ai._call_gemini(prompt)
+        if not raw:
+            raw = self.ai._call_ollama(user_message, system_prompt)
         
-        full_system_prompt = f"{persona}\n\n[TASK-SPECIFIC INSTRUCTIONS]\n{system_prompt}\n\nRespond ONLY with your reply text. No JSON unless explicitly asked for subtasks."
-        
-        return self.ai.generate_response(full_system_prompt, user_message, temperature)
+        # Clean it
+        if raw is None:
+            return "[]"
+            
+        try:
+            import json
+            data = json.loads(raw)
+            if "reply" in data:
+                return data["reply"]
+        except Exception:
+            pass
+        return raw
 
 class PreferencesAdapter:
     def __init__(self, prefs):

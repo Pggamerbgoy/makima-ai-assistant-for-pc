@@ -68,7 +68,28 @@ class WebAgent:
             paragraphs = soup.find_all("p")
             text = " ".join(p.get_text() for p in paragraphs[:10])
             text = text[:2000]
-            summary, _ = self.ai.chat(f"Summarize this in 3 sentences: {text}")
-            return summary
+
+            prompt = (
+                "Summarize the following web page content in 3 concise sentences. "
+                "Focus on the main ideas only.\n\n"
+                f"{text}"
+            )
+
+            # Prefer a plain-text generation API when available (AIHandler)
+            if hasattr(self.ai, "generate_response"):
+                try:
+                    return self.ai.generate_response(
+                        system_prompt="You are a summarization assistant.",
+                        user_message=prompt,
+                        temperature=0.2,
+                    )
+                except Exception:
+                    pass
+
+            result = self.ai.chat(prompt)
+            # AIHandler.chat → (reply, emotion); legacy backends may return str
+            if isinstance(result, tuple) and len(result) >= 1:
+                return result[0]
+            return str(result)
         except Exception as e:
             return f"Couldn't fetch that page: {e}"

@@ -241,11 +241,27 @@ class CommandRouter:
         except Exception as e:
             logger.warning(f"MediaObserver unavailable: {e}")
             self._media_obs = None
+        # Self-updater (optional — lets Makima modify her own code in a controlled way)
+        try:
+            from systems.self_updater import SelfUpdater
+            self._self_updater = SelfUpdater(ai_handler=self.ai)
+        except Exception as e:
+            logger.warning(f"SelfUpdater unavailable: {e}")
+            self._self_updater = None
 
     # ─── Intent Patterns ──────────────────────────────────────────────────────
 
     # Pattern → (handler_method, needs_match_groups)
     PATTERNS = [
+        # P3 FIX: YouTube patterns MUST come before open_app and generic play
+        (r"play (.+?) on youtube",                      "_handle_yt_play_inline"),
+        (r"play (.+?) youtube",                         "_handle_yt_play_inline"),
+        (r"youtube (?:play|search for|search) (.+)",    "_handle_yt_play_inline"),
+        (r"(?:pause|stop) youtube",                     "_handle_yt_pause_inline"),
+        (r"(?:resume|continue) youtube",                "_handle_yt_resume_inline"),
+        (r"(?:skip|next) (?:youtube|on youtube)",       "_handle_yt_skip_inline"),
+        (r"what(?:'s| is) playing (?:on )?youtube",     "_handle_yt_now_inline"),
+
         # --- Advanced Features (V4) ---
         (r"quantum simulate investment of \$?([\d,]+) in (.+)", "_handle_qs_invest"),
         (r"quantum simulate job change", "_handle_qs_job"),
@@ -342,6 +358,8 @@ class CommandRouter:
         (r"how (?:am i|are you)|learning report", "_handle_report"),
         (r"clear (?:history|chat)", "_handle_clear_history"),
         (r"status|system status", "_handle_status"),
+        # Self-update (explicit, file-scoped)
+        (r"(?:update|modify|change) your code in ([\w\/\\\.\-]+) to (.+)", "_handle_self_update"),
     ]
 
     # ─── Route ────────────────────────────────────────────────────────────────
@@ -359,7 +377,7 @@ class CommandRouter:
                         res = handler(m)
                         return (str(res) if res else ""), handler_name
                     except Exception as e:
-                        logger.exception(f"Handler {handler_name} error: {e}")
+                        logger.error(f"Handler {handler_name} error: {e}")
                         return f"Something went wrong with that command.", handler_name
 
         # Check learned skills
@@ -634,16 +652,28 @@ class CommandRouter:
         return f"Today is {datetime.now().strftime('%A')}."
 
     def _handle_greeting(self, m):
+        """P5 FIX: Morning → try briefing first, evening/night → direct reply."""
         greeting = m.group(0).lower()
         if "morning" in greeting:
+            # Try to get a real daily briefing from MakimaManager if available
+            try:
+                from core.makima_manager import MakimaManager
+                mgr = getattr(self, "_manager", None)
+                if mgr and mgr.briefing:
+                    return mgr.briefing.deliver(style="quick")
+            except Exception:
+                pass
             status = ""
             if self._sys:
-                status = f" Battery is at {self._sys.battery_status()}."
-            return f"Good morning!{status} Ready when you are."
+                try:
+                    status = f" Battery: {self._sys.battery_status()}."
+                except Exception:
+                    pass
+            return f"Good morning! {status} Ready when you are.".strip()
         elif "evening" in greeting:
-            return "Good evening! How was your day?"
+            return "Good evening. How was your day?"
         else:
-            return "Good night! Rest well."
+            return "Good night. Rest well."
 
     def _handle_report(self, m):
         stats = self.memory.get_stats()
@@ -665,7 +695,70 @@ class CommandRouter:
             f"Memory: {self.memory.get_stats()['total_entries']} entries."
         )
 
+    # ─── Self-update (Makima modifying her own code) ─────────────────────────
+
+    def _handle_self_update(self, m):
+        """
+        Allow Makima to update one of her own files in a controlled way.
+
+        Usage examples:
+            "update your code in core/ai_handler.py to change the default model"
+            "modify your code in systems/web_music.py to open playlists"
+
+        The path is treated as relative to the project root, and a .bak
+        backup is written before overwriting.
+        """
+        if not getattr(self, "_self_updater", None):
+            return "Self-updater is not available on this install."
+
+        file_path = m.group(1).strip()
+        instruction = m.group(2).strip()
+        if not file_path or not instruction:
+            return "Tell me which file and what change you want. For example: 'update your code in core/ai_handler.py to change the default model.'"
+
+        return self._self_updater.update_file(file_path, instruction)
+
     # ─── Advanced Handlers (Added from V4) ──────────────────────────────────
+
+    # P3 FIX: YouTube inline handlers (delegated to YouTubePlayer)
+    def _get_yt(self):
+        if not hasattr(self, "_yt_player") or self._yt_player is None:
+            try:
+                from systems.youtube_player import get_youtube_player
+                self._yt_player = get_youtube_player()
+            except Exception:
+                self._yt_player = None
+        return self._yt_player
+
+    def _handle_yt_play_inline(self, m):
+        query = m.group(1).strip() if m.lastindex else ""
+        if not query:
+            return "What do you want me to play on YouTube?"
+        yt = self._get_yt()
+        if not yt or not yt.available:
+            return "YouTube player needs yt-dlp. Run: pip install yt-dlp python-vlc"
+        import threading
+        result = [None]
+        def _go(): result[0] = yt.play(query)
+        t = threading.Thread(target=_go, daemon=True)
+        t.start(); t.join(timeout=15)
+        return result[0] or f"🎵 Loading '{query}' from YouTube..."
+
+    def _handle_yt_pause_inline(self, m):
+        yt = self._get_yt()
+        return yt.pause() if yt else "YouTube player not available."
+
+    def _handle_yt_resume_inline(self, m):
+        yt = self._get_yt()
+        return yt.resume() if yt else "YouTube player not available."
+
+    def _handle_yt_skip_inline(self, m):
+        yt = self._get_yt()
+        return yt.skip() if yt else "YouTube player not available."
+
+    def _handle_yt_now_inline(self, m):
+        yt = self._get_yt()
+        return yt.now_playing() if yt else "YouTube player not available."
 
     def _get_dj(self):
         if self._music_dj: return self._music_dj
@@ -676,8 +769,14 @@ class CommandRouter:
         except Exception: return None
 
     def _handle_dj_play_mood(self, m):
+        """P6 FIX: Extract the mood keyword, not the full sentence."""
         dj = self._get_dj()
-        return dj.play_mood(m.group(0)) if dj else "Music DJ is not available."
+        if not dj:
+            return "Music DJ is not available."
+        text = m.group(0).lower()
+        # Try to detect mood from the full text using MusicDJ's own detector
+        mood = dj.detect_mood(text)
+        return dj.play_mood(mood)
 
     def _get_qs(self):
         if self._quantum_simulator: return self._quantum_simulator

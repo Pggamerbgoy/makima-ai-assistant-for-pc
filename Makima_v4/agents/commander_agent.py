@@ -67,13 +67,12 @@ class CommanderAgent(BaseAgent):
         agents_list_str = "\n".join(agent_descriptions)
         
         system_prompt = f"""
-        You are Makima. You are orchestrating a swarm of specialized agents to help me.
-        Maintain your sharp, calm, and mysterious personality.
+        You are the Commander Agent. Analyze the user's request and break it into subtasks.
         
         Available agents:
 {agents_list_str}
         
-        Analyze the request and return a JSON array of subtasks. "agent" must be one of the keys above.
+        Return a JSON array of subtasks, where "agent" is one of the strictly available agents above:
         [
             {{
                 "agent": "research",
@@ -82,7 +81,7 @@ class CommanderAgent(BaseAgent):
             }}
         ]
         
-        Return ONLY the JSON array.
+        Return ONLY the JSON array, no explanation.
         """
         
         user_request = task.get('description', '')
@@ -166,10 +165,10 @@ class CommanderAgent(BaseAgent):
         Combine all agent results into coherent response
         """
         system_prompt = """
-        You are Makima. Synthesize the results from your agents.
-        BE DIRECT. If they found information, tell it to me. 
-        Don't ask "Would you like me to...?", just do it.
-        Maintain your calm, sharp, and slightly possessive persona.
+        You are the Commander Agent. Synthesize the results from multiple specialized agents
+        into a coherent, helpful response for the user.
+        
+        Be concise but complete. Focus on what the user asked for.
         """
         
         # Prepare context

@@ -266,12 +266,12 @@ def _handle_app_overview(self, m):
     return "App learner not available."
 
 APP_LEARNER_PATTERNS = [
-    (r"^learn (?:the )?app (.+)",                              "_handle_learn_app"),
-    (r"^how (?:do i|to) (.+?) in (.+)",                       "_handle_howto_in_app"),
-    (r"^how (?:do i|to) (.+)",                                "_handle_howto"),
-    (r"^next step",                                            "_handle_next_step"),
-    (r"^(?:stop|exit|cancel) (?:guide|workflow|walkthrough)",  "_handle_stop_guide"),
-    (r"^(?:tell me about|what is|describe) (?:the )?app (.+)","_handle_app_overview"),
+    (r"learn (?:the )?app (.+)",                              "_handle_learn_app"),
+    (r"how (?:do i|to) (.+?) in (.+)",                       "_handle_howto_in_app"),
+    (r"how (?:do i|to) (.+)",                                "_handle_howto"),
+    (r"next step",                                            "_handle_next_step"),
+    (r"(?:stop|exit|cancel) (?:guide|workflow|walkthrough)",  "_handle_stop_guide"),
+    (r"(?:tell me about|what is|describe) (?:the )?app (.+)","_handle_app_overview"),
 ]
 
 for _pattern, _handler_name in APP_LEARNER_PATTERNS:
@@ -463,3 +463,227 @@ for _name, _fn in [
     ("_handle_list_sessions",     _handle_list_sessions),
 ]:
     setattr(CommandRouter, _name, _fn)
+
+
+# ─── Claude Coder Commands ────────────────────────────────────────────────────
+
+def _handle_claude_status(self, m):
+    try:
+        from core.claude_coder import get_claude_coder
+        s = get_claude_coder().get_status()
+        if not s["package_installed"]:
+            return "Claude package not installed. Run: pip install anthropic"
+        if not s["api_key_set"]:
+            return (
+                "Claude Coder is ready to activate!\n"
+                "Add your API key to .env:\n  ANTHROPIC_API_KEY=sk-ant-...\n"
+                "Get one free at: console.anthropic.com"
+            )
+        status = "✅ Active" if s["available"] else "❌ Inactive"
+        return (
+            f"Claude Coder: {status}\n"
+            f"Model: {s['model']}\n"
+            f"Requests made: {s['requests_made']}\n"
+            f"Failures: {s['fail_count']}"
+        )
+    except Exception as e:
+        return f"Claude Coder unavailable: {e}"
+
+def _handle_claude_model(self, m):
+    model = m.group(1).strip()
+    valid = {
+        "haiku":  "claude-haiku-4-5-20251001",
+        "sonnet": "claude-sonnet-4-6",
+    }
+    import os
+    chosen = valid.get(model.lower(), model)
+    os.environ["CLAUDE_CODE_MODEL"] = chosen
+    try:
+        from core.claude_coder import get_claude_coder
+        get_claude_coder()._model = chosen
+    except Exception:
+        pass
+    return f"Claude Coder model set to: {chosen}"
+
+def _handle_claude_debug(self, m):
+    code = m.group(1).strip()
+    # Try Claude API first, fall back to coder persona on Gemini/Ollama
+    try:
+        from core.claude_coder import get_claude_coder
+        coder = get_claude_coder()
+        if coder.available:
+            result = coder.debug(code)
+            if result:
+                return result
+    except Exception:
+        pass
+    # Fallback: use coder persona
+    if self.ai:
+        return self.ai.code_chat(f"Debug this code and fix all errors:\n```\n{code}\n```")
+    return "AI backend not available."
+
+def _handle_claude_explain(self, m):
+    code = m.group(1).strip()
+    # Try Claude API first, fall back to coder persona
+    try:
+        from core.claude_coder import get_claude_coder
+        coder = get_claude_coder()
+        if coder.available:
+            result = coder.explain(code)
+            if result:
+                return result
+    except Exception:
+        pass
+    if self.ai:
+        return self.ai.code_chat(f"Explain what this code does, step by step:\n```\n{code}\n```")
+    return "AI backend not available."
+
+CLAUDE_CODER_PATTERNS = [
+    (r"claude (?:coder )?status|how is claude|is claude (?:coder )?(?:active|working|on)",
+     "_handle_claude_status"),
+    (r"(?:use|switch to|set) claude (?:model to )?(haiku|sonnet|claude-\S+)",
+     "_handle_claude_model"),
+    (r"debug(?:: | this: | )(.+)",
+     "_handle_claude_debug"),
+    (r"explain (?:this )?code[: ](.+)",
+     "_handle_claude_explain"),
+]
+
+for _pattern, _handler_name in CLAUDE_CODER_PATTERNS:
+    CommandRouter.PATTERNS.insert(0, (_pattern, _handler_name))
+
+for _name, _fn in [
+    ("_handle_claude_status",  _handle_claude_status),
+    ("_handle_claude_model",   _handle_claude_model),
+    ("_handle_claude_debug",   _handle_claude_debug),
+    ("_handle_claude_explain", _handle_claude_explain),
+]:
+    setattr(CommandRouter, _name, _fn)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# YouTube Player Commands
+# ══════════════════════════════════════════════════════════════════════════════
+
+def _yt_player(self):
+    """Get or create the YouTubePlayer instance."""
+    if not hasattr(self, '_yt') or self._yt is None:
+        try:
+            from systems.youtube_player import get_youtube_player
+            speak_cb = getattr(self, '_speak', None)
+            self._yt = get_youtube_player(speak_callback=speak_cb)
+        except Exception as e:
+            self._yt = None
+            logger.warning(f"YouTubePlayer unavailable: {e}")
+    return self._yt
+
+def _handle_yt_play(self, m):
+    """Play a song on YouTube — actual audio, no browser."""
+    query = m.group(1).strip() if m.lastindex and m.group(1) else ""
+    if not query:
+        return "What do you want me to play on YouTube?"
+    yt = _yt_player(self)
+    if not yt:
+        return "YouTube player not available. Run: pip install yt-dlp python-vlc"
+    if not yt.available:
+        return (
+            "yt-dlp is not installed.\n"
+            "Run this and restart Makima:\n"
+            "  pip install yt-dlp python-vlc"
+        )
+    # Play in background so UI doesn't freeze
+    import threading
+    result_box = [None]
+    def _do():
+        result_box[0] = yt.play(query)
+    t = threading.Thread(target=_do, daemon=True)
+    t.start()
+    t.join(timeout=15)   # wait up to 15s for search + stream URL
+    return result_box[0] or f"🎵 Looking up '{query}' on YouTube..."
+
+def _handle_yt_pause(self, m):
+    yt = _yt_player(self)
+    return yt.pause() if yt else "YouTube player not available."
+
+def _handle_yt_resume(self, m):
+    yt = _yt_player(self)
+    return yt.resume() if yt else "YouTube player not available."
+
+def _handle_yt_stop(self, m):
+    yt = _yt_player(self)
+    return yt.stop() if yt else "YouTube player not available."
+
+def _handle_yt_skip(self, m):
+    yt = _yt_player(self)
+    return yt.skip() if yt else "YouTube player not available."
+
+def _handle_yt_queue(self, m):
+    query = m.group(1).strip() if m.lastindex and m.group(1) else ""
+    if not query:
+        return "What do you want to queue?"
+    yt = _yt_player(self)
+    return yt.queue(query) if yt else "YouTube player not available."
+
+def _handle_yt_volume(self, m):
+    yt = _yt_player(self)
+    if not yt:
+        return "YouTube player not available."
+    nums = [int(x) for x in __import__('re').findall(r'\d+', m.group(0))]
+    if nums:
+        return yt.set_volume(nums[0])
+    return "Tell me a volume 0–100, e.g. 'youtube volume 70'."
+
+def _handle_yt_now_playing(self, m):
+    yt = _yt_player(self)
+    return yt.now_playing() if yt else "YouTube player not available."
+
+def _handle_yt_install_help(self, m):
+    return (
+        "To play YouTube audio in Makima, install these:\n\n"
+        "  pip install yt-dlp\n"
+        "  pip install python-vlc\n\n"
+        "Also install VLC media player: https://www.videolan.org/vlc/\n\n"
+        "Then say: 'play [song name] on youtube'"
+    )
+
+# ── Patterns (inserted at HIGH priority so they match before generic handlers) ─
+
+YOUTUBE_PATTERNS = [
+    # Play — catch "play X on youtube" and "play X youtube"
+    (r"play (.+?) on youtube",                          "_handle_yt_play"),
+    (r"play (.+?) youtube",                             "_handle_yt_play"),
+    (r"youtube (?:play|search for|search) (.+)",        "_handle_yt_play"),
+    (r"(?:put on|start|play) (.+) (?:from|on) yt",     "_handle_yt_play"),
+
+    # Controls
+    (r"(?:pause|stop) youtube",                         "_handle_yt_pause"),
+    (r"(?:resume|continue|unpause) youtube",            "_handle_yt_resume"),
+    (r"stop youtube|youtube stop",                      "_handle_yt_stop"),
+    (r"(?:skip|next) (?:youtube|song|track)",           "_handle_yt_skip"),
+    (r"queue (.+?) (?:on )?youtube",                    "_handle_yt_queue"),
+    (r"youtube (?:volume|vol) (?:to )?(\d+)",           "_handle_yt_volume"),
+    (r"(?:what(?:'s| is) playing|now playing) (?:on )?youtube", "_handle_yt_now_playing"),
+
+    # Help
+    (r"how (?:do i |to )?(?:install|setup|set up) youtube (?:player|audio)?",
+                                                        "_handle_yt_install_help"),
+]
+
+for _pat, _hname in YOUTUBE_PATTERNS:
+    CommandRouter.PATTERNS.insert(0, (_pat, _hname))
+
+for _name, _fn in [
+    ("_yt_player",              _yt_player),
+    ("_handle_yt_play",         _handle_yt_play),
+    ("_handle_yt_pause",        _handle_yt_pause),
+    ("_handle_yt_resume",       _handle_yt_resume),
+    ("_handle_yt_stop",         _handle_yt_stop),
+    ("_handle_yt_skip",         _handle_yt_skip),
+    ("_handle_yt_queue",        _handle_yt_queue),
+    ("_handle_yt_volume",       _handle_yt_volume),
+    ("_handle_yt_now_playing",  _handle_yt_now_playing),
+    ("_handle_yt_install_help", _handle_yt_install_help),
+]:
+    setattr(CommandRouter, _name, _fn)
+
+logger.debug("YouTube Player commands registered.")

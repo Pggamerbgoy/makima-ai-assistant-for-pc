@@ -34,7 +34,15 @@ from typing import Optional, Callable, Dict, Any
 
 logger = logging.getLogger("Makima.Manager")
 
-# ── Optional feature imports ─────────────────────────────────────────────────
+# ── Optional feature imports ─────────────────────────────────────────────
+try:
+    from core.claude_coder import get_claude_coder
+    _claude_coder = get_claude_coder()
+    CLAUDE_CODER_AVAILABLE = _claude_coder.available
+except Exception:
+    _claude_coder = None
+    CLAUDE_CODER_AVAILABLE = False
+
 try:
     from systems.mood_tracker import MoodTracker
     MOOD_AVAILABLE = True
@@ -85,31 +93,57 @@ class MusicManager:
         except Exception as e:
             logger.warning(f"Spotify unavailable: {e}")
 
+        try:
+            from systems.web_music import WebMusic
+            self._web_music = WebMusic()
+            self._ready = True
+            logger.info("🎵 MusicManager ready (WebMusic)")
+        except Exception as e:
+            logger.warning(f"WebMusic unavailable: {e}")
+            self._web_music = None
+
     # ── Public API ────────────────────────────────────────────────────────────
 
     def play(self, query: str = None) -> str:
-        """Play a song, playlist, or genre. query=None plays last/default."""
+        """P10 FIX: Play with clear fallback chain + WebMusic fallback."""
+        errors = []
+
+        # 1. Try MusicDJ (Mood-based)
+        if self._dj and query:
+            try:
+                mood = self._dj.detect_mood(query)
+                result = self._dj.play_mood(mood)
+                if result and "unavailable" not in result.lower() and "failed" not in result.lower():
+                    return result
+                errors.append("MusicDJ: " + str(result))
+            except Exception as e:
+                errors.append("MusicDJ: " + str(e))
+
+        # 2. Try SpotifyControl (Direct Search)
         if self._spotify:
             try:
-                self._spotify.play(query or "")
-                return f"Playing {query or 'your music'} on Spotify."
+                result = self._spotify.play(query or "")
+                if "unavailable" not in result.lower() and "not set" not in result.lower():
+                    return "Playing " + str(query or "your music") + " on Spotify."
+                errors.append("Spotify: " + str(result))
             except Exception as e:
-                logger.warning(f"Spotify play failed: {e}")
+                errors.append("Spotify: " + str(e))
 
-        if self._dj:
+        # 3. Fallback to WebMusic (Browser)
+        if self._web_music and query:
             try:
-                self._dj.play(query or "")
-                return f"Playing {query or 'music'}."
+                logger.info(f"Falling back to WebMusic for: {query}")
+                return self._web_music.play_any(query)
             except Exception as e:
-                logger.warning(f"MusicDJ play failed: {e}")
+                errors.append("WebMusic: " + str(e))
 
-        return "Music system unavailable."
+        if query:
+            return (
+                f"Couldn't play {repr(query)} on Spotify. "
+                "I've attempted to open it in your browser as a fallback."
+            )
+        return "Music unavailable. Tell me what you'd like to hear."
 
-    def pause(self) -> str:
-        if self._spotify:
-            try: self._spotify.pause(); return "Paused."
-            except: pass
-        return "Paused. (simulated)"
 
     def next(self) -> str:
         if self._spotify:
@@ -165,25 +199,19 @@ class AppManager:
     def open(self, app_name: str) -> str:
         if self._controller:
             result = self._controller.open(app_name)
-            if isinstance(result, dict):
-                return result.get("message", f"Opening {app_name}.")
-            return result
+            return result.get("message", f"Opening {app_name}.")
         return f"Opening {app_name}. (simulated — AppControl not loaded)"
 
     def close(self, app_name: str) -> str:
         if self._controller:
             result = self._controller.close(app_name)
-            if isinstance(result, dict):
-                return result.get("message", f"Closing {app_name}.")
-            return result
+            return result.get("message", f"Closing {app_name}.")
         return f"Closing {app_name}. (simulated)"
 
     def toggle(self, app_name: str) -> str:
         if self._controller:
             result = self._controller.toggle(app_name)
-            if isinstance(result, dict):
-                return result.get("message", f"Toggled {app_name}.")
-            return result
+            return result.get("message", f"Toggled {app_name}.")
         return f"Toggled {app_name}. (simulated)"
 
     def is_running(self, app_name: str) -> bool:
@@ -204,6 +232,7 @@ class SystemManager:
 
     def __init__(self):
         self._ctrl = None
+        # Keep backward-compat aliases for older call sites
         self._init()
 
     def _init(self):
@@ -242,6 +271,13 @@ class SystemManager:
         return self._call("screenshot", fallback="Screenshot taken. (simulated)")
 
     def lock_screen(self) -> str:
+        # SystemCommands historically exposed lock_pc(); prefer that when available.
+        if self._ctrl and hasattr(self._ctrl, "lock_pc"):
+            try:
+                result = self._ctrl.lock_pc()
+                return str(result) if result else "Screen locked."
+            except Exception as e:
+                logger.warning(f"SystemManager.lock_screen failed via lock_pc: {e}")
         return self._call("lock_screen", fallback="Screen locked. (simulated)")
 
     def focus_mode(self, enable: bool = True) -> str:
@@ -278,12 +314,10 @@ class AgentManager:
 
         try:
             from core.command_router import CommandRouter
-            from agents.skill_teacher import SkillTeacher
             self._router = CommandRouter(ai=self._ai, memory=self._memory)
-            self._router.skill_teacher = SkillTeacher(self._ai, self._router)
-            logger.info("🤖 AgentManager ready (CommandRouter + SkillTeacher)")
+            logger.info("🤖 AgentManager ready (CommandRouter)")
         except Exception as e:
-            logger.warning(f"CommandRouter/SkillTeacher unavailable: {e}")
+            logger.warning(f"CommandRouter unavailable: {e}")
 
     def run(self, task: str, use_swarm: bool = True) -> str:
         """
@@ -563,11 +597,30 @@ class WebSearchManager:
         return f"Web search unavailable. Query was: {query}"
 
     def fetch(self, url: str) -> str:
-        if self._agent and hasattr(self._agent, "fetch"):
+        """
+        Fetch and summarize a URL using the web agent.
+
+        Normalizes across legacy WebAgent APIs:
+          - prefer fetch_summary(url) when available
+          - fall back to open_url(url) on failure
+        """
+        if not self._agent:
+            return f"Could not fetch {url}"
+
+        # Prefer rich summary if supported
+        if hasattr(self._agent, "fetch_summary"):
             try:
-                return self._agent.fetch(url)
+                return self._agent.fetch_summary(url)
             except Exception as e:
-                logger.warning(f"Web fetch failed: {e}")
+                logger.warning(f"Web fetch_summary failed: {e}")
+
+        # Fallback: just open the URL
+        if hasattr(self._agent, "open_url"):
+            try:
+                return self._agent.open_url(url)
+            except Exception as e:
+                logger.warning(f"Web open_url failed: {e}")
+
         return f"Could not fetch {url}"
 
 
@@ -698,8 +751,9 @@ class MakimaManager:
         logger.debug(f"[{source}] handle: {command!r}")
         self._fire_event("on_command", command=command, source=source)
 
-        # ── Step 0: User turn (deferred save to avoid circular memory) ──────────
-        # We save this ONLY after the AI has a chance to retrieve *past* memories
+        # Save user turn to memory
+        if self._memory:
+            self._memory.save_conversation("user", command)
 
         # ── Mood analysis (non-blocking, enriches response tone) ──────────────
         mood_result = None
@@ -727,7 +781,6 @@ class MakimaManager:
                     response = self.briefing.deliver(style=style)
                     self._fire_event("on_response", response=response)
                     if self._memory:
-                        self._memory.save_conversation("user", command) # Save now
                         self._memory.save_conversation("makima", response)
                     return response
                 except Exception as e:
@@ -738,89 +791,65 @@ class MakimaManager:
             # Speak the check-in as a side-channel (doesn't replace response)
             self._fire_event("on_checkin", message=mood_result.checkin_message)
 
-        # ── Step 1: Tool pipeline (cache hit = instant return) ────────────────
-        processed = self.tools.process(command)
+        # ── Step 1: Router pattern match (fastest path — exact commands) ───────
+        # Try CommandRouter PATTERNS first — these are specific, unambiguous.
+        # e.g. "play X on youtube", "volume up", "open chrome", "lock screen"
+        if self.agents._router:
+            try:
+                resp, handler = self.agents._router.route(command)
+                if handler and handler != "ai_chat" and resp:
+                    # P7 FIX: don't cache state-dependent responses
+                    if not self._is_stateful_command(command):
+                        self.tools.cache_response(command, resp)
+                    self._finish_response(resp)
+                    return resp
+            except Exception as e:
+                logger.warning(f"Router step failed: {e}")
 
-        # Cache hit returns the response directly
-        if processed != command and len(processed) > 20:
-            self._fire_event("on_response", response=processed)
-            if self._memory:
-                self._memory.save_conversation("user", command) # Save now
-                self._memory.save_conversation("makima", processed)
-            return processed
+        # ── Step 2: Cache lookup (P7 FIX: skip stateful commands) ────────────
+        if not self._is_stateful_command(command):
+            cached = self.tools.process(command)
+            if cached != command and len(cached) > 20:
+                self._finish_response(cached)
+                return cached
 
-        # ── Step 2: Autonomous decision for vague commands ────────────────────
+        # ── Step 3: Autonomous decision for vague/preference commands ─────────
         autonomous = self.prefs.handle_command(command)
         if autonomous:
             self._execute_decision(command, autonomous)
-            self._fire_event("on_response", response=autonomous)
-            if self._memory:
-                self._memory.save_conversation("user", command) # Save now
-                self._memory.save_conversation("makima", autonomous)
+            self._finish_response(autonomous)
             return autonomous
 
-        # ── Step 3: Intent-based direct routing ──────────────────────────────
+        # ── Step 4: Intent routing (P1 FIX: single detection, P4 FIX: 0.55 threshold)
         intent = self.tools.detect_intent(command)
-        
-        if intent and intent.type == "learn_skill" and intent.confidence > 0.8:
-            task = intent.entities.get("task", command)
-            response = self.agents.run(f"learn how to {task}")
-            self.tools.cache_response(command, response)
-            self._fire_event("on_response", response=response)
-            return response
-            
-        # Detection for personal/identity/memory questions - use direct chat to preserve persona
-        # BUT only if it doesn't look like a specific system command (handled by router)
-        personal_check = any(pm in command.lower() for pm in ["who are you", "what are you", "how are you", "darling", "makima"])
-        
-        if (intent and intent.confidence > 0.75) or personal_check:
-            # Try direct routing first (for prefs, calendar, etc.)
+        if intent and intent.confidence > 0.55:
             direct = self._route_by_intent(intent, command)
             if direct:
-                self.tools.cache_response(command, direct)
-                self._fire_event("on_response", response=direct)
-                if self._memory:
-                    self._memory.save_conversation("user", command) # Save now
-                    self._memory.save_conversation("makima", direct)
+                if not self._is_stateful_command(command):
+                    self.tools.cache_response(command, direct)
+                self._finish_response(direct)
                 return direct
 
-            # If no direct route, and it's chat-like, use AI.chat
-            if (intent and intent.type == "chat") or personal_check or "favorite" in command.lower() or "my" in command.lower():
-                response, _ = self._ai.chat(command)
-                self.tools.cache_response(command, response)
-                self._fire_event("on_response", response=response)
-                if self._memory:
-                    self._memory.save_conversation("user", command) # Save now
-                    self._memory.save_conversation("makima", response)
-                return response
-
-        # ── Step 4: Decision simulator for financial questions ────────────────
+        # ── Step 5: Decision simulator for financial questions ────────────────
         if self._is_decision_question(command):
             response = self.simulator.analyze(command)
             self.tools.cache_response(command, response)
-            self._fire_event("on_response", response=response)
-            if self._memory:
-                self._memory.save_conversation("user", command) # Save now
-                self._memory.save_conversation("makima", response)
+            self._finish_response(response)
             return response
 
-        # ── Step 5: Web search for factual/current questions ─────────────────
+        # ── Step 6: Web search — P8 FIX: smarter detection ──────────────────
         if self._needs_web_search(command):
             response = self.web.search(command)
             self.tools.cache_response(command, response)
-            self._fire_event("on_response", response=response)
-            if self._memory:
-                self._memory.save_conversation("user", command) # Save now
-                self._memory.save_conversation("makima", response)
+            self._finish_response(response)
             return response
 
-        # ── Step 6: Agent swarm for everything else ───────────────────────────
-        response = self.agents.run(command)
-        self.tools.cache_response(command, response)
-        self._fire_event("on_response", response=response)
-        if self._memory:
-            self._memory.save_conversation("user", command) # Save now
-            self._memory.save_conversation("makima", response)
+        # ── Step 7: AI chat (final fallback — no re-routing) ─────────────────
+        # P2 FIX: don't call agents.run() which re-routes again. Go direct to AI.
+        response = self._ai_fallback(command)
+        if not self._is_stateful_command(command):
+            self.tools.cache_response(command, response)
+        self._finish_response(response)
         return response
 
     # ── Intent router ─────────────────────────────────────────────────────────
@@ -865,9 +894,84 @@ class MakimaManager:
             return self.web.search(query)
 
         if t == "get_info":
-            return self.agents.run(command, use_swarm=False)
+            # Simple factual question → light-weight route;
+            # complex, multi-part question → V4 swarm.
+            use_swarm = self._is_complex_query(command)
+            return self.agents.run(command, use_swarm=use_swarm)
+
+        if t == "write_code":
+            task_desc = e.get("task_description") or command
+            return self._handle_code_task(task_desc, command)
+
+        # P9 FIX: previously missing intents ────────────────────────────────
+        if t == "set_volume":
+            level = e.get("level") or e.get("value")
+            if level is not None:
+                return self.system.set_volume(int(level))
+            if "up" in command.lower():
+                return self.system.volume_up()
+            if "down" in command.lower():
+                return self.system.volume_down()
+            return self.system.mute()
+
+        if t == "set_brightness":
+            level = e.get("level") or e.get("value")
+            if level is not None:
+                return self.system.set_brightness(int(level))
+            if "up" in command.lower() or "increase" in command.lower():
+                return self.system.set_brightness(80)
+            return self.system.set_brightness(30)
+
+        if t in ("take_screenshot", "screenshot"):
+            return self.system.screenshot()
+
+        if t in ("lock_screen", "lock"):
+            return self.system.lock_screen()
+
+        if t in ("play_youtube", "youtube"):
+            query = e.get("query") or e.get("song_name") or command
+            # Route through command router which has the YouTube handler
+            if self.agents._router:
+                resp, _ = self.agents._router.route(f"play {query} on youtube")
+                return resp
+            return f"YouTube player unavailable."
+
+        if t == "set_reminder":
+            task = e.get("task") or e.get("reminder", command)
+            time_str = e.get("time") or e.get("at", "")
+            if self.agents._router and hasattr(self.agents._router, '_handle_reminder'):
+                import re as _re
+                m2 = _re.search(r"remind me to (.+) at (.+)", command.lower())
+                if m2:
+                    return self.agents._router._handle_reminder(m2)
+            return f"Reminder set: {task}" + (f" at {time_str}" if time_str else "")
 
         return None
+
+    def _handle_code_task(self, task: str, original_command: str) -> str:
+        """
+        Route a code task through the best available backend.
+        Priority: Claude API → code_chat() with Coder Persona (Gemini/Ollama)
+        """
+        # 1. Try Claude API (if key is configured)
+        if _claude_coder and _claude_coder.available:
+            try:
+                result = _claude_coder.handle_code_task(task)
+                if result:
+                    logger.info("Code task handled by Claude API.")
+                    return result
+            except Exception as e:
+                logger.warning(f"Claude API failed, falling back: {e}")
+
+        # 2. Use code_chat() — switches to the 'coder' persona for this request
+        # The coder persona instructs Gemini/Ollama to behave like a sharp code editor
+        logger.info("Code task using Coder Persona (Gemini/Ollama).")
+        try:
+            return self._ai.code_chat(task)
+        except Exception as e:
+            logger.warning(f"code_chat failed: {e}")
+            reply, _ = self._ai.chat(original_command)
+            return reply
 
     def _execute_decision(self, command: str, decision_reply: str):
         """After autonomous decision, actually execute the action."""
@@ -883,29 +987,100 @@ class MakimaManager:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
+    def _finish_response(self, response: str):
+        """Shared response finalization: fire event + save to memory."""
+        self._fire_event("on_response", response=response)
+        if self._memory:
+            self._memory.save_conversation("makima", response)
+
+    def _ai_fallback(self, command: str) -> str:
+        """P2 FIX: Direct AI call — no re-routing through agents.run()."""
+        if self._ai:
+            try:
+                memory_ctx = self._memory.build_memory_context(command) if self._memory else ""
+                resp, _ = self._ai.chat(command, context=memory_ctx)
+                return resp
+            except Exception as e:
+                logger.warning(f"AI fallback failed: {e}")
+        # Last resort: agents swarm (only if AI unavailable)
+        if self.agents._v4:
+            try:
+                return self.agents._v4.process(command)
+            except Exception:
+                pass
+        return "I'm having trouble thinking right now. Try again in a moment."
+
+    # P7 FIX: State-dependent commands should never be cached
+    _STATEFUL_COMMANDS = (
+        "now playing", "what's playing", "battery", "cpu", "ram", "memory usage",
+        "what time", "what date", "what day", "status", "is playing", "playing now",
+        "volume", "brightness", "weather", "news", "score", "price",
+    )
+
+    def _is_stateful_command(self, command: str) -> bool:
+        """Returns True for commands whose answer changes over time — don't cache these."""
+        c = command.lower()
+        return any(kw in c for kw in self._STATEFUL_COMMANDS)
+
     def _is_decision_question(self, command: str) -> bool:
         keywords = ["should i invest", "should i buy", "should i change job",
                     "should i start", "is it worth", "monte carlo", "simulate"]
         return any(k in command.lower() for k in keywords)
 
-    def _needs_web_search(self, command: str) -> bool:
+    def _is_complex_query(self, command: str) -> bool:
+        """
+        Heuristic: does this look like a multi-step / research-heavy task?
+        If so, prefer the V4 agent swarm over a single-shot chat reply.
+        """
         c = command.lower()
-        # Explicit search requests
-        explicit = ["search for", "look up", "google", "find out", "search the web"]
+        keywords = [
+            "and then",
+            "also",
+            "research",
+            "analyze",
+            "analysis",
+            "compare",
+            "step by step",
+            "plan",
+            "strategy",
+            "outline",
+            "multi-step",
+        ]
+        return any(k in c for k in keywords) or len(c.split()) > 40
+
+    def _needs_web_search(self, command: str) -> bool:
+        """P8 FIX: Only trigger web search when actually needed."""
+        c = command.lower()
+
+        # Explicit search requests — always search
+        explicit = ["search for", "look up", "google", "find out", "search the web",
+                    "browse", "find on internet"]
         if any(k in c for k in explicit):
             return True
-        # Current / real-time info markers
+
+        # Real-time info that changes — always search
         realtime = ["latest news", "current news", "news today", "breaking news",
-                    "today's weather", "weather today", "weather in", "stock price",
-                    "current price", "live score"]
+                    "weather today", "weather in", "weather tomorrow",
+                    "stock price", "current price", "live score", "score today",
+                    "exchange rate", "crypto price"]
         if any(k in c for k in realtime):
             return True
-        # "what is" only if NOT about self/memory/system
-        personal_markers = ["my ", "your ", "makima", "you ", "i ", "we ", "our ", "about", "know", "tell", "think", "get", "got", "let", "who are you", "what are you"]
-        if "what is" in c or "who are you" in c or "who is" in c:
-            # Skip web if it's a personal/internal question
-            if not any(pm in c for pm in personal_markers):
-                return True
+
+        # "what is X" — only search for external facts, NOT local/system topics
+        if "what is" in c or "who is" in c or "what are" in c:
+            # Skip web for personal/system/internal questions
+            skip_markers = [
+                "my ", "your ", "makima", "you ", "i ", "we ", "our ",
+                "time", "date", "day", "battery", "cpu", "ram", "volume",
+                "focus mode", "the time", "the date", "2+2", "math",
+                "status", "running", "installed",
+            ]
+            if any(m in c for m in skip_markers):
+                return False
+            # Only search for "who is [person]" or "what is [concept]" that
+            # aren't system commands
+            return True
+
         return False
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────

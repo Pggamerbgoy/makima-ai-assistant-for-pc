@@ -28,7 +28,6 @@ A modular, self-learning, bilingual (English/Hindi) AI assistant with voice I/O,
 | 🔋 **Battery Monitor** | Alerts at < 20% battery |
 | 🖼️ **Overlay** | Semi-transparent on-screen display of Makima's responses |
 | 👥 **3 Personas** | Makima, Normal, Date mode with auto-language detection |
-| ⚡ **Performance Engine**| Tool registry with response caching, intent detection, and fast file search |
 
 ---
 
@@ -177,17 +176,9 @@ makima/
 │   ├── eternal_memory.py        # Persistent memory, TF-IDF search
 │   └── command_router.py        # Intent routing for all commands
 ├── agents/
-│   ├── skill_teacher.py         # Self-learning: generate, verify, hot-load skills (AST Auto-Fix)
+│   ├── skill_teacher.py         # Self-learning: generate, verify, hot-load skills
 │   ├── web_agent.py             # DuckDuckGo search + page fetching
-│   └── auto_coder.py            # Write and run Python code (Strict Generator mode)
-├── makima_tools/                # ⚡ Performance & Optimization Suite
-│   ├── tool_registry.py         # Orchestrates all performance tools
-│   ├── response_cache.py        # 0ms latency for repeated queries
-│   ├── intent_detector.py       # Instant RegEx-based intent routing
-│   ├── smart_file_finder.py     # Background-indexed fast file search
-│   ├── context_compressor.py    # AI context window optimization
-│   ├── proactive_engine.py      # Background task hook system
-│   └── shortcut_expander.py     # User-defined command shorthands
+│   └── auto_coder.py            # Write and run Python code on demand
 ├── systems/
 │   ├── app_control.py           # Fuzzy app open/close
 │   ├── spotify_control.py       # Spotify Web API playback
@@ -255,23 +246,6 @@ Open `http://localhost:8000` in any browser on your LAN. Type commands and get r
 # Install Ollama from https://ollama.ai
 ollama pull mistral       # or llama3, phi3, gemma, etc.
 # Makima auto-detects it when Gemini is unavailable
-```
-
----
-
-## 🧪 Testing & Performance
-
-To verify the integrity of the system and measure overhead:
-
-```bash
-# 1. Run the Tool Integration Suite
-python test_makima_tools.py
-
-# 2. Benchmark Tool Footprint (RAM & Latency)
-python benchmark_tools.py
-
-# 3. Run Full System Integration Tests
-python test_makima_full.py
 ```
 
 ---

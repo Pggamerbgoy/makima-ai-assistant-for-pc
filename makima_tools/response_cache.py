@@ -48,18 +48,17 @@ class ResponseCache:
         if key in self.cache:
             entry = self.cache[key]
             entry["hits"] += 1
-            self._save()
             print(f"[Cache] ✅ Exact hit ({entry['hits']} hits)")
             return entry["response"]
 
-        # Fuzzy match (for slight rephrasing)
-        for k, entry in self.cache.items():
-            similarity = SequenceMatcher(None, query.lower(), entry["query"].lower()).ratio()
-            if similarity >= SIMILARITY_THRESHOLD:
-                entry["hits"] += 1
-                self._save()
-                print(f"[Cache] 🔍 Fuzzy hit ({similarity:.0%} similar)")
-                return entry["response"]
+        # Fuzzy match (for slight rephrasing) — skip very short queries to avoid noise
+        if len(query.strip()) >= 10:
+            for k, entry in self.cache.items():
+                similarity = SequenceMatcher(None, query.lower(), entry["query"].lower()).ratio()
+                if similarity >= SIMILARITY_THRESHOLD:
+                    entry["hits"] += 1
+                    print(f"[Cache] 🔍 Fuzzy hit ({similarity:.0%} similar)")
+                    return entry["response"]
 
         return None
 

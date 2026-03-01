@@ -178,13 +178,8 @@ class EternalMemory:
         logger.info(f"📝 Remembered: {key} = {value}")
 
     def recall_note(self, key: str) -> Optional[str]:
-        """Find a note by partial key match, prioritizing exact matches."""
+        """Find a note by partial key match."""
         key_lower = key.lower()
-        # 1. Exact match
-        for k, v in self.notes.items():
-            if k.lower() == key_lower:
-                return v
-        # 2. Partial match
         for k, v in self.notes.items():
             if key_lower in k.lower() or k.lower() in key_lower:
                 return v
@@ -265,12 +260,12 @@ class EternalMemory:
         if not notes:
             return ""
 
-        lines = ["\n[USER MEMORIES & PERSONAL FACTS] (Critical: Use this to answer as if you remember them)"]
+        lines = ["[Relevant memories:]"]
         for note in notes:
             text = note.strip()
             if text:
-                lines.append(f"- User previously mentioned: {text}")
-        lines.append("[End of memories. Speak naturally using these facts.]")
+                lines.append(f"- {text}")
+        lines.append("[Only use above if directly relevant to the question.]")
         return "\n".join(lines)
 
     # ─── Stats ────────────────────────────────────────────────────────────────

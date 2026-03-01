@@ -30,10 +30,18 @@ class KnowledgeGraph:
         return nx.DiGraph()
     
     def _save_graph(self):
-        """Save graph to file. Throttled to prevent disk spamming during rapid inserts."""
+        """
+        Save graph to file.
+
+        Throttled to prevent disk spamming during rapid inserts:
+        we only persist at most once every 5 seconds.
+        """
+        now = time.time()
+        if now - self.last_save < 5.0:
+            return
         try:
             nx.write_graphml(self.graph, self.storage_path)
-            self.last_save = time.time()
+            self.last_save = now
         except Exception as e:
             print(f"⚠️ Graph serialization failed: {e}")
 

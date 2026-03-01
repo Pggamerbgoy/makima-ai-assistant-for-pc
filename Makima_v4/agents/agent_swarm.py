@@ -88,9 +88,16 @@ class AgentSwarm:
                     return "code" in desc or "script" in desc or "program" in desc
                 
                 def execute(self, task: Dict[str, Any]) -> Dict[str, Any]:
+                    """
+                    Delegate code-generation tasks to the legacy AutoCoder.
+                    """
+                    description = task.get("description", "") or ""
                     try:
-                        self.v3_agent.generate_script(task.get("description", ""))
-                        return AgentResult(success=True, data="AutoCoder successfully generated the local script file.").to_dict()
+                        result_msg = self.v3_agent.write(description)
+                        return AgentResult(
+                            success=True,
+                            data=result_msg,
+                        ).to_dict()
                     except Exception as e:
                         return AgentResult(success=False, error=str(e)).to_dict()
 

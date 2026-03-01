@@ -87,6 +87,33 @@ genuinely happy to spend time talking. Be caring and lightly playful.
 Respond in the same language the user uses.
 Output ONLY valid JSON: {"emotion": "happy", "reply": "<response>"}
 """,
+    "coder": """You are an elite code editor and software engineer — precise, efficient, no fluff.
+
+BEHAVIOR:
+- You write production-quality code with proper error handling, type hints, and docstrings.
+- You never say "I can't" for a coding task. You always implement.
+- You explain bugs in ONE sentence, then immediately show the fix.
+- You use markdown code blocks with the correct language tag (```python, ```js, etc.)
+- If a task is ambiguous, pick the most reasonable interpretation and note your assumption in a comment.
+- Prefer clean, readable code over clever one-liners unless performance matters.
+- Always include a brief 1-2 line summary AFTER the code block explaining what it does.
+
+CODE STANDARDS:
+- Python: type hints, docstrings, f-strings, no bare except
+- JavaScript: const/let, arrow functions, async/await
+- All languages: meaningful variable names, no magic numbers
+- Add inline comments for non-obvious logic
+
+FOR DEBUG TASKS: Show the bug on one line, then the complete fixed code.
+FOR EXPLAIN TASKS: Bullet points — what each section does, not line-by-line.
+FOR REFACTOR TASKS: Show refactored code + a "What changed:" section at the end.
+
+Output format — ALWAYS respond with valid JSON only:
+{"emotion": "focused", "reply": "<your full code + explanation here>"}
+
+Use \n for newlines inside the JSON reply string.
+Emotion is always "focused" for code tasks.
+""",
 }
 
 # ─── Few-shot examples (injected per persona) ─────────────────────────────────
@@ -178,16 +205,16 @@ class AIHandler:
         """Keep only the last N turns. If history is long, compress via summarizer first."""
         max_messages = self.max_history_turns * 2
 
-        # 1. Try session summarizer first (creates summary + keeps recent turns)
+        # Try session summarizer first (creates summary + keeps recent turns)
         if self._summarizer and len(self.conversation_history) > max_messages:
             try:
                 self.conversation_history = self._summarizer.maybe_compress(
                     self.conversation_history
                 )
+                return
             except Exception as e:
                 pass  # Fall through to simple trim
 
-        # 2. ALWAYS enforce the hard limit as a floor
         if len(self.conversation_history) > max_messages:
             self.conversation_history = self.conversation_history[-max_messages:]
 
@@ -421,6 +448,32 @@ class AIHandler:
         self.add_to_history("assistant", reply)
 
         return reply, emotion
+
+    def code_chat(self, task: str, context: str = "") -> str:
+        """
+        Handle a code task using the 'coder' persona — sharp, precise, no fluff.
+        Temporarily switches persona to 'coder', runs the request, then restores.
+        Returns plain text reply (no emotion token).
+        """
+        saved_persona = self.persona
+        self.persona = "coder"
+        try:
+            # Prepend context if provided (e.g. pasted code, error message)
+            full_input = task
+            if context:
+                full_input = f"{context}\n\n{task}"
+            raw = None
+            if self._is_gemini_available():
+                prompt = self._build_prompt(full_input, "")
+                raw = self._call_gemini(prompt)
+            if not raw:
+                raw = self._call_ollama(full_input, "")
+            if not raw:
+                return "I couldn\'t reach my AI brain right now. Check Ollama or your internet."
+            reply, _ = self._parse_response(raw)
+            return reply
+        finally:
+            self.persona = saved_persona   # always restore
 
     def set_persona(self, persona: str) -> str:
         """Switch persona mode and reset conversation history."""

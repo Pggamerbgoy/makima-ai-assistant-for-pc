@@ -20,15 +20,44 @@ class AutoCoder:
         self.ai = ai
         os.makedirs(CODES_DIR, exist_ok=True)
 
-    def write(self, task: str) -> str:
-        """Generate Python code for a task."""
+    def _generate_code(self, task: str) -> str:
+        """
+        Generate Python code for a task using the configured AI handler.
+
+        Supports both legacy plain-chat backends and the newer AIHandler
+        that returns (reply, emotion).
+        """
         prompt = (
             f"Write clean, runnable Python code to: {task}\n"
             f"Rules: use only stdlib or common packages, include comments, "
             f"no markdown fences, no explanation — just the code."
         )
-        sys_prompt = "You are an expert Python programmer. Write code matching the exact requirements. Output ONLY valid Python code."
-        code = self.ai.generate_response(sys_prompt, prompt)
+
+        # Prefer a raw text generation API if available
+        if hasattr(self.ai, "generate_response"):
+            try:
+                return self.ai.generate_response(
+                    system_prompt="You are a code generator. Return ONLY Python source code.",
+                    user_message=prompt,
+                    temperature=0.2,
+                )
+            except Exception:
+                pass
+
+        # Fallback to chat-style APIs
+        try:
+            result = self.ai.chat(prompt)
+        except TypeError:
+            result = self.ai.chat(prompt)  # let underlying handler raise if incompatible
+
+        # AIHandler.chat returns (reply, emotion); older backends may return plain str
+        if isinstance(result, tuple) and len(result) >= 1:
+            return result[0]
+        return str(result)
+
+    def write(self, task: str) -> str:
+        """Generate Python code for a task."""
+        code = self._generate_code(task)
         # Strip any accidental markdown fences
         import re
         code = re.sub(r"```python\s*", "", code)
@@ -65,5 +94,4 @@ class AutoCoder:
             return f"Script failed: {e}"
 
     def explain(self, code: str) -> str:
-        resp, _ = self.ai.chat(f"Explain this code in simple terms:\n\n{code}")
-        return resp
+        return self.ai.chat(f"Explain this code in simple terms:\n\n{code}")

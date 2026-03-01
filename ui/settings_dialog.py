@@ -217,6 +217,37 @@ class SettingsDialog(QDialog):
         self.calendar_enabled.setChecked(os.getenv("CALENDAR_ENABLED", "0") == "1")
         form.addRow("", self.calendar_enabled)
 
+        # Claude (Anthropic)
+        self.anthropic_api_key = QLineEdit(os.getenv("ANTHROPIC_API_KEY", ""))
+        self.anthropic_api_key.setEchoMode(QLineEdit.PasswordEchoOnEdit)
+        self.anthropic_api_key.setPlaceholderText("sk-ant-...  (get free key at console.anthropic.com)")
+        form.addRow("Claude API Key:", self.anthropic_api_key)
+
+        self.claude_model_combo = QComboBox()
+        self.claude_model_combo.addItems(["claude-haiku-4-5-20251001 (fast, cheap)", "claude-sonnet-4-6 (smarter, costlier)"])
+        current_model = os.getenv("CLAUDE_CODE_MODEL", "claude-haiku-4-5-20251001")
+        if "sonnet" in current_model:
+            self.claude_model_combo.setCurrentIndex(1)
+        form.addRow("Claude Model:", self.claude_model_combo)
+
+        # Claude status indicator
+        from core.claude_coder import get_claude_coder
+        try:
+            s = get_claude_coder().get_status()
+            if s["available"]:
+                claude_status = QLabel("✅ Claude Coder is active")
+                claude_status.setStyleSheet("color: #00ff88;")
+            elif s["api_key_set"]:
+                claude_status = QLabel("⚠️ Key found but client not initialized — restart Makima")
+                claude_status.setStyleSheet("color: #FFA500;")
+            else:
+                claude_status = QLabel("💡 Add your API key above to activate Claude as code editor")
+                claude_status.setStyleSheet("color: #aaaaaa;")
+        except Exception:
+            claude_status = QLabel("Claude Coder module not loaded")
+            claude_status.setStyleSheet("color: #aaaaaa;")
+        form.addRow("", claude_status)
+
         # Note about restart
         note = QLabel("<i>Note: Some changes require restarting Makima.</i>")
         note.setStyleSheet("color: #888888; font-size: 11px;")
@@ -292,6 +323,8 @@ class SettingsDialog(QDialog):
                 "SPOTIPY_CLIENT_ID": self.spotify_client_id.text().strip(),
                 "SPOTIPY_CLIENT_SECRET": self.spotify_client_secret.text().strip(),
                 "CALENDAR_ENABLED": "1" if self.calendar_enabled.isChecked() else "0",
+                "ANTHROPIC_API_KEY": self.anthropic_api_key.text().strip(),
+                "CLAUDE_CODE_MODEL": self.claude_model_combo.currentText().split(" ")[0],
             }
             self._update_env_file(env_updates)
             

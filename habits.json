@@ -2,9 +2,10 @@
   "exercise": {
     "name": "exercise",
     "log": [
-      "2026-02-28"
+      "2026-02-28",
+      "2026-03-01"
     ],
-    "streak": 1,
-    "longest_streak": 1
+    "streak": 2,
+    "longest_streak": 2
   }
 }

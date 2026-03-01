@@ -78,29 +78,16 @@ def run(args: str = "") -> str:
             f"Rules:\n"
             f"1. Write ONLY the function body (no def line, no class).\n"
             f"2. Use standard library or common packages (os, subprocess, psutil, pyautogui, requests).\n"
-            f"3. MUST use the `return` keyword at the top level of the body to return the final string result. Do NOT use `print`.\n"
-            f"4. Do NOT define nested functions. The `def` keyword is strictly forbidden.\n"
-            f"5. Handle exceptions gracefully and return an error string if something fails.\n"
-            f"6. Keep it short — under 30 lines.\n"
-            f"7. Do NOT include markdown code fences (```).\n\n"
+            f"3. Return a string that Makima will speak aloud.\n"
+            f"4. Handle exceptions gracefully and return an error string if something fails.\n"
+            f"5. Keep it short — under 30 lines.\n"
+            f"6. Do NOT include markdown code fences.\n\n"
             f"Function body only:"
         )
-        sys_prompt = "You are an expert Python programmer. Write code matching the exact requirements."
-        raw = self.ai.generate_response(sys_prompt, prompt)
+        raw, _ = self.ai.chat(prompt)   # ai.chat() returns (reply, emotion)
         # Strip markdown fences if the model includes them
         raw = re.sub(r"```python\s*", "", raw)
         raw = re.sub(r"```\s*", "", raw)
-        
-        # Hack to auto-fix stubbornly wrapped functions. If the LLM defined a function 
-        # as the last statement instead of calling it, we automatically call it.
-        try:
-            tree = ast.parse(raw)
-            if tree.body and isinstance(tree.body[-1], ast.FunctionDef):
-                func_name = tree.body[-1].name
-                raw += f"\nreturn {func_name}()\n"
-        except SyntaxError:
-            pass
-
         # Indent all lines for the function body
         indented = "\n    ".join(raw.strip().splitlines())
         return indented
@@ -136,7 +123,6 @@ def run(args: str = "") -> str:
                     keywords=repr(keywords),
                     code=body,
                 )
-                print(f"--- GENERATED CODE ---\n{file_content}\n----------------------")
                 valid, err = self._verify_code(file_content)
                 if valid:
                     path = os.path.join(SKILLS_DIR, f"{name}.py")

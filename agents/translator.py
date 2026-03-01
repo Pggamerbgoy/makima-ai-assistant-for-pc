@@ -56,7 +56,7 @@ DEEPL_KEY = os.getenv("DEEPL_API_KEY", "")
 
 
 class TranslationSystem:
-    """Translation and language detection service."""
+    """Bidirectional real-time translation with auto-detection."""
 
     def __init__(self, ai):
         self.ai = ai
@@ -130,8 +130,8 @@ class TranslationSystem:
             f"Return ONLY the translation, nothing else:\n\n{text}"
         )
 
-    def detect_language(self, text: str) -> tuple[str, str]:
-        """Detect language of text. Returns (code, name)."""
+    def detect_language(self, text: str) -> str:
+        """Detect language of text."""
         if self._gtrans:
             try:
                 result = self._gtrans.detect(text)

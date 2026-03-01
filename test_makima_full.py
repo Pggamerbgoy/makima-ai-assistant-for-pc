@@ -1275,8 +1275,7 @@ def test_macros():
     def t_run_nonexistent():
         r = macros.run_macro("nonexistent_macro_xyz_12345")
         assert r and isinstance(r, str)
-        r_low = r.lower()
-        assert any(w in r_low for w in ["not found", "no macro", "error", "nonexistent", "not installed", "unavailable", "pynput"])
+        assert "not found" in r.lower() or "no macro" in r.lower() or "error" in r.lower() or "nonexistent" in r.lower()
         return r
 
     run("List macros",                t_list,             "macros")
@@ -1289,23 +1288,21 @@ def test_macros():
 
 def test_translator():
     section("20. TRANSLATOR")
-    from agents.translator import TranslationSystem
+    from agents.translator import Translator
     from core.ai_handler import AIHandler
 
     ai = AIHandler()
-    t  = TranslationSystem(ai=ai)
+    t  = Translator(ai=ai)
 
     def t_detect_english():
-        res = t.detect_language("Hello how are you today")
-        assert res and (isinstance(res, str) or isinstance(res, (tuple, list)))
-        code = res[0] if isinstance(res, (tuple, list)) else res
-        return code
+        lang = t.detect_language("Hello how are you today")
+        assert lang and isinstance(lang, str)
+        return lang
 
     def t_detect_hindi():
-        res = t.detect_language("नमस्ते आप कैसे हैं")
-        # googletrans might return a list or tuple
-        code = res[0] if isinstance(res, (tuple, list)) else res
-        return code
+        lang = t.detect_language("नमस्ते आप कैसे हैं")
+        assert lang and isinstance(lang, str)
+        return lang
 
     def t_enable_disable():
         r = t.enable("hindi")
@@ -1450,18 +1447,15 @@ def test_regressions():
     # BUG 4 & 5: _get_dj and _get_qs use self._ not free function
     def t_bug4_dj_method_call():
         src = Path("core/command_router.py").read_text(encoding="utf-8")
-        # Should have self._get_dj() calls in handlers.
-        assert "self._get_dj()" in src, "Missing self._get_dj() calls"
-        # The buggy version was something like 'dj = _get_dj(self)'
-        assert "_get_dj(self)" not in src.replace("def _get_dj(self):", ""), \
-            "Still has buggy _get_dj(self) call (outside of definition)"
+        # Should have self._get_dj() not _get_dj(self)
+        assert "self._get_dj()" in src, "Missing self._get_dj()"
+        assert "_get_dj(self)" not in src, "Still has buggy _get_dj(self) call"
         return "method call correct"
 
     def t_bug5_qs_method_call():
         src = Path("core/command_router.py").read_text(encoding="utf-8")
-        assert "self._get_qs()" in src, "Missing self._get_qs() calls"
-        assert "_get_qs(self)" not in src.replace("def _get_qs(self):", ""), \
-            "Still has buggy _get_qs(self) call (outside of definition)"
+        assert "self._get_qs()" in src, "Missing self._get_qs()"
+        assert "_get_qs(self)" not in src, "Still has buggy _get_qs(self) call"
         return "method call correct"
 
     # BUG 6: mute regex doesn't match unmute

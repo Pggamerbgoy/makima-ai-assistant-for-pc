@@ -101,12 +101,6 @@ INTENTS = {
         "entities": [],
         "required": [],
         "examples": ["hey makima", "how are you doing"]
-    },
-    "learn_skill": {
-        "patterns": ["learn", "teach yourself", "teach me", "how to"],
-        "entities": ["task"],
-        "required": ["task"],
-        "examples": ["learn how to greet me", "teach yourself to open browser"]
     }
 }
 
@@ -169,8 +163,7 @@ class IntentDetector:
         # Priority overrides — explicit trigger words always win
         OPEN_TRIGGERS = ["open ", "launch ", "start ", "fire up ", "load "]
         CLOSE_TRIGGERS = ["close ", "quit ", "exit ", "kill ", "stop "]
-        INFO_TRIGGERS = ["what is ", "what are ", "what time", "explain "]
-        LEARN_TRIGGERS = ["learn how to ", "learn ", "teach yourself ", "teach me "]
+        INFO_TRIGGERS = ["what is ", "what are ", "what time", "how does ", "how do ", "explain "]
 
         if any(text_lower.startswith(t) for t in OPEN_TRIGGERS):
             scores["open_app"] = max(scores["open_app"], 0.92)
@@ -178,8 +171,6 @@ class IntentDetector:
             scores["close_app"] = max(scores.get("close_app", 0), 0.92)
         if any(t in text_lower for t in INFO_TRIGGERS):
             scores["get_info"] = max(scores["get_info"], 0.88)
-        if any(t in text_lower for t in LEARN_TRIGGERS):
-            scores["learn_skill"] = max(scores.get("learn_skill", 0), 0.92)
 
         # Pick best match
         best_intent = max(scores, key=scores.get)

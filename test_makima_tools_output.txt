@@ -1,0 +1,35 @@
+test_01_shortcut_expander (__main__.TestMakimaToolsIntegration.test_01_shortcut_expander)
+Test ShortcutExpander inside ToolRegistry. ... ok
+test_02_intent_detector (__main__.TestMakimaToolsIntegration.test_02_intent_detector)
+Test IntentDetector inside ToolRegistry. ... ok
+test_03_response_cache (__main__.TestMakimaToolsIntegration.test_03_response_cache)
+Test ResponseCache pipeline inside ToolRegistry. ... ok
+test_04_smart_file_finder (__main__.TestMakimaToolsIntegration.test_04_smart_file_finder)
+Test SmartFileFinder inside ToolRegistry. ... ok
+test_05_proactive_engine (__main__.TestMakimaToolsIntegration.test_05_proactive_engine)
+Test ProactiveEngine inside ToolRegistry. ... ok
+test_06_context_compressor (__main__.TestMakimaToolsIntegration.test_06_context_compressor)
+Test ContextCompressor inside ToolRegistry. ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 1.012s
+
+OK
+≡ƒöº Initializing Makima tools...
+  Γ£à Response Cache ready
+  Γ£à Context Compressor ready
+  Γ£à Smart File Finder ready (indexing in background)
+  Γ£à Intent Detector ready
+[Proactive] Engine started
+  Γ£à Proactive Engine started
+[Shortcuts] Loaded 0 default shortcuts
+  Γ£à Shortcut Expander ready
+≡ƒöº All tools initialized!
+
+[Shortcuts] 'tst' ΓåÆ 'run the test suite'
+[Tools] Intent(open_app, conf=72%, entities={'app_name': 'the'}, missing=[])
+[Shortcuts] ≡ƒÆí You've said 'learn how to do math' 5 times. Want me to create shortcut 'lht' for it?
+[Tools] Intent(learn_skill, conf=98%, entities={'task': 'do math'}, missing=[])
+[Shortcuts] ≡ƒÆí You've said 'what is the capital of france' 5 times. Want me to create shortcut 'wit' for it?
+[Tools] Intent(get_info, conf=88%, entities={'topic': 'the capital of france'}, missing=[])
+[Cache] Γ£à Exact hit (1 hits)
