@@ -208,6 +208,19 @@ This is an active project seeking **community code review**.
 
 ---
 
+## 🔍 Code Review Requested!
+
+This is a personal project now open for **community code review**. I am looking for feedback on:
+
+- **Threading safety** in the `_hud()` and voice loops
+- **Exception handling** (making it more specific)
+- **Architecture patterns** for scaling system plugins
+- **Performance** optimizations for low-end hardware
+
+If you find a bug or have a suggestion, please [Open an Issue](https://github.com/Pggamerbgoy/makima/issues/new).
+
+---
+
 ## 🏗️ Architecture
 
 ```
@@ -311,4 +324,4 @@ Makima auto-detects Hindi (Devanagari or Hinglish) in both voice and text:
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE). Built with ❤️ using Python, Gemini, and Ollama.
+MIT License. Built with ❤️ using Python, Gemini, and Ollama.
