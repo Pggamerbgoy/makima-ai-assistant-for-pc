@@ -20,6 +20,10 @@ _test_results.log
 _test_results_full.json
 health_data.json
 user_preferences.json
+app_index.json
+habits.json
+background_activity.json
+background_activity.json
 data/feedback.db
 
 # Generated Assets
