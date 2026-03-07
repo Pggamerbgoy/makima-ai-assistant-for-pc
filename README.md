@@ -52,29 +52,28 @@ A modular, self-learning, bilingual (English/Hindi) AI assistant with voice I/O,
 
 ## 🚀 Quick Start
 
-### 1. Clone & Install
+### 1. One-Click Setup (Recommended)
+This script will automatically download Ollama (if missing), install all Python dependencies, and prepare your environment.
 
 ```bash
-git clone https://github.com/yourname/makima.git
+git clone https://github.com/Pggamerbgoy/makima.git
 cd makima
-pip install -r requirements.txt
+python setup_makima.py
 ```
 
-> **Note:** `PyAudio` may require system packages:
-> - Windows: `pip install pipwin && pipwin install pyaudio`
-> - Linux: `sudo apt install portaudio19-dev && pip install pyaudio`
-
-### 2. Configure Environment
+### 2. Manual Installation
+If you prefer to do it yourself:
 
 ```bash
-cp .env.example .env
-# Edit .env and add your API keys
-```
+# Install dependencies
+pip install -r requirements.txt
 
-Minimum required for full functionality:
-- `GEMINI_API_KEY` — for online AI (optional if using Ollama)
-- `SPOTIPY_*` — for Spotify control
-- `TELEGRAM_BOT_TOKEN` — for remote control
+# (Windows specific) If PyAudio fails:
+pip install pipwin && pipwin install pyaudio
+
+# Configure environment
+cp .env.example .env # Add your API keys!
+```
 
 ### 3. Run
 
