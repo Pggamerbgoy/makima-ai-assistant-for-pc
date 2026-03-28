@@ -1,326 +1,93 @@
-# 🌸 Makima AI Assistant
+# 🌸 Makima AI Assistant for PC
 
-A modular, self-learning, bilingual (English/Hindi) AI assistant with voice I/O, persistent memory, cloud sync, remote control, and a multi-backend AI engine.
+**Makima** is an advanced, open-source AI assistant for your desktop—combining productivity, automation, and creativity, with voice control and self-learning capabilities.  
+> Bilingual (English/Hindi) • Modular Plugins • Cloud Sync • Remote Control
 
----
-
-## ✨ Features
-
-| Module | Description |
-|--------|-------------|
-| 🧠 **AI Engine** | Auto-switches between Google Gemini (online) and Ollama (offline) |
-| 🎙️ **Voice I/O** | Wake word activation ("Hey Makima"), bilingual speech recognition, offline TTS |
-| 🧬 **Self-Learning** | Writes, verifies, and hot-loads new Python skills at runtime |
-| 🗄️ **Eternal Memory** | TF-IDF semantic search across all past conversations |
-| 🎵 **Spotify Control** | Play, pause, skip, search tracks via Spotify Web API |
-| 📱 **App Control** | Fuzzy-matched open/close for any installed app |
-| 🖥️ **System Commands** | Volume, lock, screenshot, CPU/RAM/battery, window management |
-| 📡 **Telegram Remote** | Full command access from anywhere via Telegram bot |
-| 🌐 **Web Dashboard** | Browser UI at localhost:8000 for LAN control |
-| ☁️ **Cloud Sync** | Auto-syncs memories to Google Drive every 12 hours |
-| 🔒 **Security Scanner** | Voice-triggered Windows Defender / ClamAV scans |
-| 🎯 **Focus Mode** | Auto-kills distracting apps on a timer |
-| ⌨️ **Macros** | Record and replay keyboard/mouse sequences |
-| 📅 **Reminders** | Time-based spoken alerts with natural language parsing |
-| 🌐 **Web Agent** | DuckDuckGo instant answers + browser fallback |
-| 🤖 **Auto Coder** | Generates and runs Python scripts on demand |
-| 📋 **Clipboard Monitor** | Detects copied URLs and offers to open them |
-| 🔋 **Battery Monitor** | Alerts at < 20% battery |
-| 🖼️ **Overlay** | Semi-transparent on-screen display of Makima's responses |
-| 👥 **3 Personas** | Makima, Normal, Date mode with auto-language detection |
-| 🖥️ **Electron UI** | Rich Desktop HUD and command center interface |
-| 🎮 **Proactive Engine** | Makima can initiate actions autonomously |
-| 👁️ **Vision & Screen** | Screen reading capabilities and Face/Emotion tracking |
-| 🌐 **Web Downloader** | Autonomous web search and Scrapy downloading |
-| 📱 **App Learner** | Autonomously learns how to use new applications |
-| 🎵 **Media & Music** | Spotify, YouTube playback, and intelligent Music DJ |
-| 💬 **Communication** | WhatsApp automation and Email management |
-| 📅 **Productivity** | Calendar tracking, File manager, Meeting assistant, Hotkeys |
-| ❤️ **Personal Care** | Health data tracker and Mood monitoring |
-| 📡 **Remote Control** | Full command access from anywhere via Telegram bot/Web UI |
-| ⌨️ **System Mastery** | Macros, fuzzy app matching, Focus Mode blocking, Battery alerts |
-| 🔒 **Security / Cloud** | Voice-triggered Defender scans, hourly Google Drive sync |
+**Project Type:** Python desktop app (96% Python, 3% HTML)
 
 ---
 
-### Advanced Capabilities (Experimental)
-*   **Translation Engine**: Real-time multi-language translation.
-*   **Self-Updater**: System auto-updates components.
-*   **Quantum Simulator**: Experimental module.
+## ✨ Why try Makima?
+- **Voice activation** ("Hey Makima") for hands-free control
+- **Grows smarter** with self-learning—teach it new Python skills at runtime
+- **Persistent memory** with semantic search of all conversations
+- **Automates** Spotify, WhatsApp, reminders, system, and more
+- **Remote control** via Telegram or browser dashboard
+- **Open source**—privacy-friendly and extensible
 
 ---
 
-## 🚀 Quick Start
-
-### 1. One-Click Setup (Recommended)
-This script will automatically download Ollama (if missing), install all Python dependencies, and prepare your environment.
+## 🚀 Quickstart
 
 ```bash
-git clone https://github.com/Pggamerbgoy/makima.git
-cd makima
+git clone https://github.com/Pggamerbgoy/makima-ai-assistant-for-pc.git
+cd makima-ai-assistant-for-pc
 python setup_makima.py
+# or manually: pip install -r requirements.txt
 ```
 
-### 2. Manual Installation
-If you prefer to do it yourself:
-
+Then, run:
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# (Windows specific) If PyAudio fails:
-pip install pipwin && pipwin install pyaudio
-
-# Configure environment
-cp .env.example .env # Add your API keys!
+python makima_assistant.py     # Full voice/text UI
+python makima_assistant.py --text   # Text-only/test mode
 ```
 
-### 3. Run
-
-```bash
-# Voice mode (microphone required)
-python makima_assistant.py
-
-# Text mode (no microphone needed, great for testing)
-python makima_assistant.py --text
-```
+**Windows tip:** If PyAudio fails, run:  
+`pip install pipwin && pipwin install pyaudio`
 
 ---
 
-## 🗣️ Voice Commands
+## 🗣️ Example Voice/Text Commands
 
-### Memory
-```
-Remember that [X]               → saves a note
-Do you remember [X]             → recalls from memory
-Memory stats                    → shows memory count
-```
+- "Remember that Alice's birthday is June 2"  
+- "Lock PC"  
+- "Play music"  
+- "Learn how to convert PDF to text"  
+- "Remind me to drink water at 5pm"  
+- "Switch to normal/date/makima mode"  
+- "Sync memory to cloud"  
+- "Run macro evening"  
 
-### AI & Persona
-```
-Switch to normal mode           → neutral AI persona
-Switch to date mode             → friendly/playful persona
-Switch to makima mode           → default persona
-Clear history                   → resets conversation context
-```
-
-### Self-Learning
-```
-Learn how to [task]             → generates + saves a new skill
-List skills                     → shows all learned skills
-```
-
-### Apps
-```
-Open [app name]                 → launches any installed app
-Close [app name]                → kills the process
-Scan apps                       → rebuilds app index
-```
-
-### Spotify
-```
-Play music                      → resumes Spotify
-Pause                           → pauses
-Next song                       → skips forward
-Previous song                   → goes back
-```
-
-### Volume
-```
-Volume to 60                    → sets to 60%
-Volume up / Volume down
-Mute / Unmute
-```
-
-### System
-```
-Lock PC
-Screenshot
-CPU usage
-RAM usage
-Battery status
-Maximize window / Minimize window / Close window
-Empty recycle bin
-```
-
-### Focus & Productivity
-```
-Start focus                     → kills distracting apps
-Stop focus                      → deactivates
-Start recording macro [name]    → records keyboard/mouse
-Stop recording                  → saves macro
-Run macro [name]                → replays macro
-Remind me to [task] at [time]   → sets a spoken reminder
-```
-
-### Security
-```
-Quick scan
-Full scan / Deep scan
-Scan my downloads
-```
-
-### Cloud
-```
-Sync memory to cloud            → immediate Google Drive backup
-Upload [file] to cloud
-```
-
-### Web & Code
-```
-Search for [query]              → DuckDuckGo / browser search
-Write code to [task]            → generates Python script
-Run code [filename]             → executes a script
-```
-
-### Utilities
-```
-What time is it?
-What's today's date?
-What day is it?
-Good morning / Good evening     → morning briefing
-Status                          → AI + memory status
-```
+And hundreds more—see full command list below!
 
 ---
 
-## 🔍 Code Review Requested!
+## 🖥️ Feature Highlights
 
-This is an active project seeking **community code review**.
-
-**Known Issues to Review:**
-- Threading safety in `_hud()` method
-- Exception handling specificity
-- Language detection hardcoding
-- Missing shutdown/cleanup
-- Microphone calibration blocking
-
-**Please open an issue if you find:**
-- 🐛 Bugs
-- 🔒 Security vulnerabilities
-- 📈 Performance problems
-- 🏗️ Architecture improvements
-- 📝 Documentation gaps
-- ✨ Code quality concerns
-
-**Your feedback helps improve this project!**
+| Module                  | Description                                                               |
+|-------------------------|---------------------------------------------------------------------------|
+| 🧠 AI Engine            | Switches between Google Gemini (online) and Ollama (offline)              |
+| 🎙️ Voice I/O           | Wake word, bilingual speech, offline TTS                                  |
+| 🧬 Self-Learning        | Learns new Python skills at runtime                                       |
+| 🗄️ Eternal Memory       | Long-term, searchable memory (across all conversations)                   |
+| 🎵 Spotify Control      | Play/pause, search, skip tracks via Spotify API                           |
+| 📱 App Control          | Fuzzy open/close any installed app                                        |
+| 🖥️ System Mastery       | Volume, lock, screenshot, battery, window & focus mode                    |
+| 📡 Remote Control       | Telegram bot & LAN web dashboard                                          |
+| 🔒 Security             | Voice-activated Defender or ClamAV scans                                  |
+| 📅 Productivity         | Reminders, calendar, macros, file manager                                 |
+| ❤️ Personal Care        | Health and mood tracking                                                  |
+| 💬 Communication        | WhatsApp automation, email                                                |
+| 👁️ Vision & Screen      | Face/emotion/screen reading                                               |
+| ...and more!            | Developer-friendly plugin architecture                                    |
 
 ---
 
-## 🔍 Code Review Requested!
+## 🙌 Please Star and Share!
 
-This is a personal project now open for **community code review**. I am looking for feedback on:
+If Makima helped you—or you're curious about AI automation—please consider [starring the repo](https://github.com/Pggamerbgoy/makima-ai-assistant-for-pc/stargazers)!
+- Ask feedback, file issues, or contribute 👏
 
-- **Threading safety** in the `_hud()` and voice loops
-- **Exception handling** (making it more specific)
-- **Architecture patterns** for scaling system plugins
-- **Performance** optimizations for low-end hardware
-
-If you find a bug or have a suggestion, please [Open an Issue](https://github.com/Pggamerbgoy/makima/issues/new).
-
----
-
-## 🏗️ Architecture
-
-```
-makima/
-├── makima_assistant.py          # Main entry — voice loop, TTS, monitors
-├── core/
-│   ├── ai_handler.py            # Gemini + Ollama backends, persona, history
-│   ├── proactive_engine.py      # Autonomously initiates actions
-│   ├── eternal_memory.py        # Persistent memory, TF-IDF search
-│   └── command_router.py        # Intent routing for all commands
-├── agents/
-│   ├── skill_teacher.py         # Self-learning: generate, verify, hot-load skills
-│   ├── web_agent.py             # DuckDuckGo search + page fetching
-│   ├── app_learner.py           # Learns app UI paths
-│   ├── screen_reader.py         # Reads active screen text
-│   └── auto_coder.py            # Write and run Python code on demand
-├── systems/
-│   ├── app_control.py           # Fuzzy app open/close
-│   ├── spotify_control.py       # Spotify Web API playback
-│   ├── system_commands.py       # Volume, lock, screenshot, CPU/RAM/battery
-│   ├── focus_mode.py            # Distraction blocking
-│   ├── macros.py                # Keyboard/mouse macro recorder
-│   ├── reminder.py              # Time-based spoken reminders
-│   ├── security_manager.py      # Antivirus scanning
-│   ├── media_observer.py        # Track currently playing media
-│   ├── battery_monitor.py       # Low battery alerts
-│   ├── clipboard_monitor.py     # URL detection in clipboard
-│   ├── overlay.py               # On-screen text display (tkinter)
-│   ├── music_dj.py              # DJ module for media
-│   ├── whatsapp_manager.py      # WhatsApp automation
-│   ├── health_tracker.py        # Health & mood tracking
-│   └── ...                      # 15+ other system plugins
-├── ui/                          # Rich Electron-based UI components
-├── remote/
-│   ├── telegram_remote.py       # Telegram bot remote control
-│   └── web_dashboard.py         # Local browser UI (port 8000)
-├── cloud/
-│   └── cloud_manager.py         # Google Drive sync (12h auto)
-├── learned_skills/              # Auto-generated skill plugins (hot-loaded)
-├── makima_memory/               # Persistent conversation logs + notes
-├── screenshots/                 # Saved screenshots
-├── generated_code/              # Auto-generated scripts
-├── macros/                      # Saved macro recordings
-├── requirements.txt
-└── .env.example
-```
-
----
-
-## 🧬 Self-Learning System
-
-When you say **"Learn how to [task]"**, Makima:
-
-1. Checks if it's already a built-in command
-2. Prompts Gemini/Ollama to write a Python function for the task
-3. Verifies the code compiles (syntax check, up to 2 retries with self-correction)
-4. Saves the skill to `learned_skills/[name].py`
-5. Hot-loads it instantly — no restart needed
-
-Next time you give a matching command, the learned skill runs automatically.
-
----
-
-## 🔌 Remote Access
-
-### Telegram
-Set `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`, then the bot auto-starts with Makima. Message your bot to control Makima from anywhere.
-
-### Web Dashboard
-Open `http://localhost:8000` in any browser on your LAN. Type commands and get responses in real time.
-
----
-
-## 🛠️ Adding New Systems
-
-1. Create `systems/my_system.py` with a class
-2. Import and instantiate it in `core/command_router.py`
-3. Add regex patterns to `CommandRouter.PATTERNS`
-4. Add a handler method `_handle_my_command(self, m)`
-
----
-
-## 📦 Optional Local LLM (Ollama)
-
-```bash
-# Install Ollama from https://ollama.ai
-ollama pull mistral       # or llama3, phi3, gemma, etc.
-# Makima auto-detects it when Gemini is unavailable
-```
-
----
-
-## 🌏 Bilingual Support
-
-Makima auto-detects Hindi (Devanagari or Hinglish) in both voice and text:
-- English phrases → responded to in English
-- Hindi phrases → responded to in Hindi
-- Wake word works in English: "Hey Makima"
+Share with friends and the community to help this project grow.  
+Demo, screenshots, and more info coming soon!
 
 ---
 
 ## 📄 License
 
-MIT License. Built with ❤️ using Python, Gemini, and Ollama.
+MIT. Built with ❤️ in Python.
+
+---
+
+> _Want to contribute, have feedback, or spot a bug?_  
+> [Open an Issue](https://github.com/Pggamerbgoy/makima-ai-assistant-for-pc/issues/new) or start a Discussion!
